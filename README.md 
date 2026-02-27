@@ -1,0 +1,52 @@
+## Rotating Savings
+
+A web-based application designed to manage rotating savings groups in a structured and transparent way.
+The platform centralizes payout schedules, payout order, and payment tracking into one organized system,
+ eliminating confusion caused by managing savings through chat platforms.
+
+### Features
+    User registration and authentication
+    Secure login & logout
+    Create and join savings groups
+    Automatic random payout order generation
+    Payout schedule display
+    Payment tracking (Paid / Unpaid status)
+    Upload payment proof (image screenshots)
+    User dashboard displaying group activity
+    Session management using Flask-Login
+
+### System Architecture
+    The application follows the MVC (Model–View–Controller) design pattern:
+    Models → Database structure using Flask-SQLAlchemy
+    Views → HTML templates rendered with Jinja2
+    Controllers → Flask routes handling business logic
+    Authentication Layer → Flask-Login manages user sessions
+
+### Technology Stack
+    - Backend
+        Python
+        Flask
+        Flask-SQLAlchemy
+        Flask-Login
+        Flask-WTF
+    - Frontend
+        HTML
+        CSS
+        JavaScript
+    - Database
+        SQLite
+    - Version Control
+        Git
+        GitHub
+### Security Features
+- Password hashing
+- Session-based authentication
+- Login protection using @login_required
+- CSRF protection with Flask-WTF
+- Secure file upload handling for payment proofs
+
+### Testing Strategy
+- Manual testing of authentication flows
+- Validation of payout order generation
+- Payment tracking verification
+- User acceptance testing with savings group participants

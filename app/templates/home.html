@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <h1>Welcome {{ current_user.full_name }} to Rotating Savings</h1>
+    <p>
+        Manage your savings group in one place.<br>
+        Track payout schedules, payment status, and proof uploads.
+    </p>
+    <a href="{{ url_for('main.logout') }}">Logout</a>
+</div>
+{% endblock %}
