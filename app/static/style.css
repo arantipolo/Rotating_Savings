@@ -48,3 +48,17 @@ body {
     border-radius: 10px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
+
+.buttons {
+    font-size: 20px;
+    background-color: white;
+    text-decoration-color: black;
+}
+.buttons:hover {
+    background-color: #30a505;
+    text-decoration-color: white;
+}
+
+.buttons a {
+    text-decoration-line: none;
+}
