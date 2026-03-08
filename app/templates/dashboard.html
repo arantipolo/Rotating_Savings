@@ -11,8 +11,8 @@
 
 <div class="dashboard-actions card">
     <h2>Quick Actions</h2>
-    <a href="{{ url_for('main.create_group') }}">Create Group</a>
-    <a href="{{ url_for('main.join_group') }}">Join Group</a>
+    <button class="buttons"><a href="{{ url_for('main.create_group') }}">Create Group</a></button>
+    <button class="buttons"><a href="{{ url_for('main.join_group') }}">Join Group</a></button>
 </div>
 
 <div class="user-groups card">
@@ -32,6 +32,7 @@
 </div>
 
 <div class="logout card">
-    <a href="{{ url_for('main.logout') }}">Logout</a>
+
+    <button class="buttons"><a href="{{ url_for('main.logout') }}">Logout</a></button
 </div>
 {% endblock %}
