@@ -1,21 +1,32 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 from app.forms import RegistrationForm, LoginForm
-from app.models import User
+from app.models import User, GroupMember
 from app import db
 
 main = Blueprint('main', __name__)
 
 @main.route('/')
-@login_required
 def home():
     return render_template('home.html')
 
-@main.route('/dashboard')
+@main.route('/dashboard', methods=['GET', 'POST'])
 @login_required
 def dashboard():
     groups = current_user.groups
+    memberships = GroupMember.query.filter_by(user_id=current_user.id).all()
+    groups = [membership.group for membership in memberships]
     return render_template('dashboard.html', groups=groups)
+
+@main.route('/join_group', methods=['GET', 'POST'])
+@login_required
+def join_group():
+    return render_template('join_group.html')
+
+@main.route('/create_group', methods=['GET', 'POST'])
+@login_required
+def create_group():
+    return render_template('create_group.html')
 
 @main.route('/register', methods=['GET', 'POST'])
 def register():
