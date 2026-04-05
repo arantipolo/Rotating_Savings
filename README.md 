@@ -1,4 +1,4 @@
-## Rotating Savings
+### Rotating Savings
 
 A web-based application designed to manage rotating savings groups in a structured and transparent way.
 The platform centralizes payout schedules, payout order, and payment tracking into one organized system,
@@ -50,3 +50,113 @@ The platform centralizes payout schedules, payout order, and payment tracking in
 - Validation of payout order generation
 - Payment tracking verification
 - User acceptance testing with savings group participants
+
+### Database Design:
+#### ER Diagram
+```mermaid
+
+erDiagram
+
+    USER {
+        int id PK
+        string full_name
+        string email
+        string password_hash
+        datetime created_at
+    }
+
+    GROUP {
+        int id PK
+        string name
+        float contribution_amount
+        int payout_frequency_days
+        datetime created_at
+    }
+
+    GROUPMEMBER {
+        int id PK
+        int user_id FK
+        int group_id FK
+        int payout_position
+        boolean has_received
+    }
+
+    PAYOUTSCHEDULE {
+        int id PK
+        date payout_date
+        int recipient_id FK
+        int group_id FK
+    }
+
+    PAYMENT {
+        int id PK
+        int payer_id FK
+        int payout_id FK
+        float amount
+        string proof_image
+        datetime paid_at
+    }
+
+    USER ||--o{ GROUPMEMBER : joins
+    GROUP ||--o{ GROUPMEMBER : has_members
+
+    GROUP ||--o{ PAYOUTSCHEDULE : schedules
+
+    USER ||--o{ PAYMENT : makes
+    PAYOUTSCHEDULE ||--o{ PAYMENT : collects
+
+    USER ||--o{ PAYOUTSCHEDULE : receives
+
+```
+### Architecture Diagram
+
+```mermaid
+flowchart TD
+
+User[User Browser]
+
+Frontend[Web Client Frontend<br>HTML / CSS / JavaScript]
+
+FlaskApp[Flask Backend Server<br>Application Logic]
+
+Auth[Authentication System<br>Flask-Login]
+
+Database[(SQLite / PostgreSQL Database)]
+
+Uploads[File Storage<br>Payment Proof Images]
+
+User -->|User Actions| Frontend
+Frontend -->|HTTP Requests| FlaskApp
+
+FlaskApp -->|Auth Requests| Auth
+FlaskApp -->|Query / Store Data| Database
+FlaskApp -->|Upload Files| Uploads
+
+FlaskApp -->|Response Data| Frontend
+Frontend -->|Display UI| User
+```
+### Workflow Diagram
+```mermaid
+flowchart TD
+
+Login[User logs into system]
+
+Dashboard[User dashboard]
+
+ViewSchedule[View payout schedule]
+
+SendPayment[Send payment to payout recipient]
+
+UploadProof[Upload payment proof screenshot]
+
+SystemCheck[System records payment]
+
+StatusUpdate[Payment status updated]
+
+Login --> Dashboard
+Dashboard --> ViewSchedule
+ViewSchedule --> SendPayment
+SendPayment --> UploadProof
+UploadProof --> SystemCheck
+SystemCheck --> StatusUpdate
+```
