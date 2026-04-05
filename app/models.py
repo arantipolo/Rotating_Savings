@@ -4,9 +4,13 @@ from datetime import datetime
 from flask_login import UserMixin
 
 class GroupMember(db.Model):
+    # A user cannot join the same group twice.
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'group_id', name='unique_user_group'),
+    )
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    group_id = db.Column(db.Integer, db.ForeignKey('group.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    group_id = db.Column(db.Integer, db.ForeignKey('group.id'), nullable=False)
     payout_position = db.Column(db.Integer)
     has_received = db.Column(db.Boolean, default=False)
 
@@ -22,13 +26,17 @@ class User(UserMixin, db.Model):
 
     groups = db.relationship('GroupMember', back_populates='user')
 
+    payments_made = db.relationship('Payment', foreign_keys='Payment.payer_id', backref='payer')
+    payouts_received = db.relationship('PayoutSchedule', foreign_keys='PayoutSchedule.recipient_id',
+                                       backref='recipient')
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
-    def __repr__(self):
+    def __repr__(self):   # Defines how object are displayed for debugging purposes
         return f"<User {self.email}>"
 
 
@@ -59,8 +67,8 @@ class PayoutSchedule(db.Model):
 
 class Payment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    payer_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    payout_id = db.Column(db.Integer, db.ForeignKey('payout_schedule.id'))
+    payer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    payout_id = db.Column(db.Integer, db.ForeignKey('payout_schedule.id'), nullable=False)
     amount = db.Column(db.Float, nullable=False)
     proof_image = db.Column(db.String(255))
     paid_at = db.Column(db.DateTime, default=datetime.utcnow)
