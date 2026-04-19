@@ -1,8 +1,34 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <h1>Create Group</h1>
-    <div class="card">
-    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#exampleModal">Create</button>
-    </div>
+<h1>Create Group</h1>
+
+<div class="card p-3">
+    <!--Sends data via POST to backend route -->
+    <form method="POST">
+
+        <!-- Group name input -->
+        <div class="form-group">
+            <label for="name">Group Name</label>
+            <!-- Identifies the group in the system -->
+            <input type="text" name="name" class="form-control" required>
+        </div>
+
+        <!-- Contribution amount input -->
+        <div class="form-group mt-2">
+            <label for="amount">Contribution Amount</label>
+            <!-- Defines how much each member contributes per cycle -->
+            <input type="number" name="amount" class="form-control" required>
+        </div>
+
+        <div class="form-group mt-2">
+            <label for="members">Number of Members</label>
+             <!-- Used for planning group size (future expansion logic) -->
+            <input type="number" name="members" class="form-control" required>
+        </div>
+
+        <!-- Submit button triggers group creation process -->
+       <button type="submit" class="btn btn-success mt-3">Create Group</button>
+    </form>
+</div>
 {% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Displays all available savings groups in the system
+    users can browse and join groups -->
+<h2>Available Groups</h2>
+
+{% if groups %}
+    <!-- Loop through all groups retrieved from database -->
+    {% for group in groups %}
+        <div class="card p-3 mb-2">
+                <!-- Group identification -->
+            <h3>{{ group.name }}</h3>
+<!-- Financial requirement per member -->
+            <p>💰 Contribution: {{ group.contribution_amount }}</p>
+           <!-- Current number of participants in group -->
+            <p>👥 Members: {{ group.members|length }}</p>
+
+            <!-- Sends POST request to backend to create membership
+                 This triggers GroupMember creation in database-->
+            <form method="POST" action="{{ url_for('main.join_group', group_id=group.id) }}">
+                <button class="buttons">Join Group</button>
+            </form>
+
+        </div>
+    {% endfor %}
+{% else %}
+    <p>No groups available yet.</p>
+{% endif %}
+
+{% endblock %}
