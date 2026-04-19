@@ -27,6 +27,18 @@
         </ul>
         </div>
     </nav>
+ <!-- Breadcrumb Navigation - shows user location in app-->
+    <div class="breadcrumb">
+        {% if breadcrumb %}
+            {% for item in breadcrumb %}
+                {% if not loop.last %}
+                    <a href="{{ item.url }}">{{ item.label }}</a> &gt;
+                {% else %}
+                    <span>{{ item.label }}</span>
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+    </div>
  <!--flash message system, displays success/error messages from backend actions-->
             {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}

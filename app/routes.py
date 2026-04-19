@@ -19,26 +19,42 @@ def assign_payouts(group_id):
     for member, pos in zip(members, positions):  # Assign each member a payout position
         member.payout_position = pos
 
+    # Save changes to database
     db.session.commit()
 
-# landing page
+def build_breadcrumbs(*items):
+    return [{"label": label, "url": url} for label, url in items]
+
+# home page
 @main.route('/')
 def home():
-    return render_template('home.html')
+    return render_template('home.html', breadcrumb=[{'name': 'Home', "url": None}])
 
 # User dashboard showing all groups they belong to
 @main.route('/dashboard')
 @login_required
 def dashboard():
     memberships = list(current_user.groups)  # already gives GroupMember objects
-    return render_template('dashboard.html', memberships=memberships)
+    breadcrumbs = [
+        {"label": "Home", "url": url_for('main.home')},
+        {"label": "Dashboard", "url": None}
+    ]
+
+    return render_template('dashboard.html', memberships=memberships,
+                           breadcrumb=breadcrumbs
+                           )
 
 # Displays all available groups so users can browse and join
 @main.route('/groups')
 @login_required
 def groups():
     all_groups = Group.query.all()
-    return render_template('groups.html', groups=all_groups)
+    breadcrumbs = [
+        {"label": "Home", "url": url_for('main.home')},
+        {"label": "Dashboard", "url": url_for('main.dashboard')},
+        {"label": "Groups", "url": None}
+    ]
+    return render_template('groups.html', groups=all_groups, breadcrumb=breadcrumbs)
 
 # Handles joining a group (prevents duplicate memberships)
 @main.route('/join_group/<int:group_id>', methods=['POST'])
@@ -103,7 +119,14 @@ def create_group():
         flash("Group created", "success")
         return redirect(url_for('main.dashboard'))
 
-    return render_template('create_group.html')
+    bredcrumbs = [
+        {"label": "Home", "url": url_for('main.home')},
+        {"label": "Dashboard", "url": url_for('main.dashboard')},
+        {"label": "Create Group", "url": None}
+    ]
+
+    return render_template(
+        'create_group.html', breadcrumb=bredcrumbs)
 
 #user registration flow
 @main.route('/register', methods=['GET', 'POST'])
@@ -122,8 +145,11 @@ def register():
 
         flash('Registration successful! Please log in.')
         return redirect(url_for('main.login'))
-
-    return render_template('register.html', form=form)
+    breadcrumbs = [
+        {"label": "Home", "url": url_for('main.home')},
+        {"label": "Register", "url": None}
+    ]
+    return render_template('register.html', form=form, breadcrumb=breadcrumbs)
 
 # Login with clear error handling for missing user or wrong password
 @main.route('/login', methods=['GET', 'POST'])
@@ -152,8 +178,11 @@ def login():
 
         next_page = request.args.get('next')
         return redirect(next_page) if next_page else redirect(url_for('main.dashboard'))
-
-    return render_template('login.html', form=form)
+    breadcrumb = [
+        {"label": "Home", "url": url_for('main.home')},
+        {"label": "Login", "url": None}
+    ]
+    return render_template('login.html', form=form, breadcrumb=breadcrumb)
 
 
 # logout and clears session and forces cookie reset
