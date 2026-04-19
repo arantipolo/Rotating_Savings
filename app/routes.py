@@ -1,33 +1,111 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session
 from flask_login import login_user, logout_user, login_required, current_user
 from app.forms import RegistrationForm, LoginForm
-from app.models import User, GroupMember
+from app.models import User, Group, GroupMember, PayoutSchedule, Payment
 from app import db
+
+import random
 
 main = Blueprint('main', __name__)
 
+# Randomly assigns payout positions to group members
+# This determines the order each member receives payouts
+def assign_payouts(group_id):
+    members = GroupMember.query.filter_by(group_id=group_id).all()
+
+    positions = list(range(1, len(members) + 1)) # Create sequential positions
+    random.shuffle(positions)  # Shuffle to randomize payout order
+
+    for member, pos in zip(members, positions):  # Assign each member a payout position
+        member.payout_position = pos
+
+    db.session.commit()
+
+# landing page
 @main.route('/')
 def home():
     return render_template('home.html')
 
-@main.route('/dashboard', methods=['GET', 'POST'])
+# User dashboard showing all groups they belong to
+@main.route('/dashboard')
 @login_required
 def dashboard():
-    groups = current_user.groups
-    memberships = GroupMember.query.filter_by(user_id=current_user.id).all()
-    groups = [membership.group for membership in memberships]
-    return render_template('dashboard.html', groups=groups)
+    memberships = list(current_user.groups)  # already gives GroupMember objects
+    return render_template('dashboard.html', memberships=memberships)
 
-@main.route('/join_group', methods=['GET', 'POST'])
+# Displays all available groups so users can browse and join
+@main.route('/groups')
 @login_required
-def join_group():
-    return render_template('join_group.html')
+def groups():
+    all_groups = Group.query.all()
+    return render_template('groups.html', groups=all_groups)
 
+# Handles joining a group (prevents duplicate memberships)
+@main.route('/join_group/<int:group_id>', methods=['POST'])
+@login_required
+def join_group(group_id):
+
+    # check if user is already part of the group
+    existing = GroupMember.query.filter_by(
+        user_id=current_user.id,
+        group_id=group_id
+    ).first()
+
+    if existing:
+        flash("You already joined this group", "warning")
+        return redirect(url_for('main.dashboard'))
+
+    # add user to group
+    membership = GroupMember(
+        user_id=current_user.id,
+        group_id=group_id
+    )
+
+    db.session.add(membership)
+    db.session.commit()
+
+    flash("Joined group successfully!", "success")
+    return redirect(url_for('main.dashboard'))
+
+# Creates a new savings group and adds creator as first member
 @main.route('/create_group', methods=['GET', 'POST'])
 @login_required
 def create_group():
+    if request.method == 'POST':
+        name = request.form.get('name')
+        amount = request.form.get('amount')
+        members = request.form.get('members')
+
+        if not name or not amount:
+            flash("Missing required fields", "danger")
+            return redirect(url_for('main.create_group'))
+
+        group = Group(
+            name = name,
+            contribution_amount=float(amount)
+        )
+
+        db.session.add(group)
+        db.session.commit()
+
+        # automatically add creator to the group
+        membership = GroupMember(
+            user_id = current_user.id,
+            group_id = group.id,
+            payout_position=None
+        )
+
+        db.session.add(membership)
+        db.session.commit()
+
+        assign_payouts(group.id)   # generate randomized payout order
+
+        flash("Group created", "success")
+        return redirect(url_for('main.dashboard'))
+
     return render_template('create_group.html')
 
+#user registration flow
 @main.route('/register', methods=['GET', 'POST'])
 def register():
     form = RegistrationForm()
@@ -47,28 +125,49 @@ def register():
 
     return render_template('register.html', form=form)
 
+# Login with clear error handling for missing user or wrong password
 @main.route('/login', methods=['GET', 'POST'])
 def login():
-    if current_user.is_authenticated:
-        return redirect(url_for('main.home'))
+    if current_user.is_authenticated:  # Prevent logged-in users from seeing login page again
+        return redirect(url_for('main.dashboard'))
 
     form = LoginForm()
 
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
-        if user and user.check_password(form.password.data):
-            login_user(user, remember=form.remember.data)
-            flash('You have been logged in.')
-            next_page = request.args.get('next')
-            return redirect(next_page) if next_page else redirect(url_for('main.home'))
-        else:
-            flash('Login failed.')
+
+        # If email does not exist in system
+        if not user:
+            flash("No account found with this email. Please register.", "danger")
+            return redirect(url_for('main.register'))
+
+        # If password is incorrect
+        if not user.check_password(form.password.data):
+            flash("Incorrect password. Please try again.", "danger")
+            return redirect(url_for('main.login'))
+
+        # successful login
+        login_user(user, remember=form.remember.data)
+        flash("You have been logged in.", "success")
+
+        next_page = request.args.get('next')
+        return redirect(next_page) if next_page else redirect(url_for('main.dashboard'))
 
     return render_template('login.html', form=form)
 
+
+# logout and clears session and forces cookie reset
 @main.route('/logout')
 @login_required
 def logout():
     logout_user()
-    flash('You have been logged out.')
+    session.clear()
+
+    # force cookie reset
+    response = redirect(url_for('main.login'))
+    response.delete_cookie('session')
+    return response
+    # response.set_cookie('session', '', expires=0)
+    flash('You have been logged out.', 'success')
+
     return redirect(url_for('main.login'))

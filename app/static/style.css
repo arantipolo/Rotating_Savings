@@ -53,6 +53,7 @@ body {
     font-size: 20px;
     background-color: white;
     text-decoration-color: black;
+    border-radius: 5px;
 }
 .buttons:hover {
     background-color: #30a505;
@@ -61,4 +62,23 @@ body {
 
 .buttons a {
     text-decoration-line: none;
+}
+
+.flash {
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 5px;
+    color: white;
+}
+
+.flash.success {
+    background-color: green;
+}
+
+.flash.danger {
+    background-color: red;
+}
+
+.flash.warning {
+    background-color: orange;
 }

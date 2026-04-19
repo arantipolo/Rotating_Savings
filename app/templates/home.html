@@ -2,11 +2,23 @@
 
 {% block content %}
 <div class="card">
+{% if current_user.is_authenticated %}
     <h1>Welcome {{ current_user.full_name }} to Rotating Savings</h1>
     <p>
         Manage your savings group in one place.<br>
         Track payout schedules, payment status, and proof uploads.
     </p>
+    <button class="buttons"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></button>
     <button class="buttons"><a href="{{ url_for('main.logout') }}">Logout</a></button>
+{% else %}
+<h1>Welcome {{ current_user.full_name }}</h1>
+      <p>
+        Manage your savings group in one place.<br>
+        Track payout schedules, payment status, and proof uploads.
+    </p>
+<button class="buttons">
+    <a href="{{ url_for('main.login') }}">Login</a>
+</button>
+{% endif %}
 </div>
 {% endblock %}
