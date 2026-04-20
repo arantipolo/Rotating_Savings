@@ -1,0 +1,41 @@
+<h3>{{ group.name }}</h3>
+
+<table border="1" width="100%">
+    <tr>
+        <th>Member</th>
+        <th>Payout Date</th>
+        <th>Paid?</th>
+    </tr>
+
+    {% for member in group.members %}
+    <tr>
+        <td>{{ member.user.full_name }}</td>
+
+        <td>
+            {% set payout = group.payouts | selectattr("recipient_id", "equalto", member.user_id) | first %}
+            {{ payout.payout_date if payout else "-" }}
+        </td>
+
+        <td>
+            {% if member.has_received %}
+                ✅
+            {% else %}
+                ❌
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+<br>
+{% if group.owner_id == current_user.id %}
+<button class="btn-primary" onclick="generatePayouts({{ group.id }})">
+    Generate Payout Schedule
+</button>
+{% endif %}
+
+{% if group.owner_id == current_user.id %}
+<button class="btn-danger" onclick="deleteGroup({{ group.id }})">
+    Delete Group
+</button>
+{% endif %}

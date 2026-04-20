@@ -1,9 +1,9 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session, jsonify, abort
 from flask_login import login_user, logout_user, login_required, current_user
 from app.forms import RegistrationForm, LoginForm
 from app.models import User, Group, GroupMember, PayoutSchedule, Payment
 from app import db
-
+from datetime import datetime, timedelta
 import random
 
 main = Blueprint('main', __name__)
@@ -20,6 +20,44 @@ def assign_payouts(group_id):
         member.payout_position = pos
 
     # Save changes to database
+    db.session.commit()
+
+# Generates payout dates for each member
+def generate_payout_schedule(group_id):
+
+    # prevent duplicate schedules if function is called again
+    PayoutSchedule.query.filter_by(group_id=group_id).delete()
+    db.session.commit()
+
+    # Get all members in this group
+    members = GroupMember.query.filter_by(group_id=group_id).all()
+
+    # Get group details (needed for frequency)
+    group = Group.query.get(group_id)
+
+    # Use today's date as the starting point
+    start_date = datetime.utcnow().date()
+
+    # Loop through each member and assign a payout date
+    for member in members:
+
+        # payout_position determines when they receive payout
+        # For example, if position 1 gets paid today, then position 2 will get paid in 14 days
+        # position 3 will be at 28th day.
+        payout_date = start_date + timedelta(
+            days=group.payout_frequency_days * (member.payout_position - 1)
+        )
+
+        # Create a payout schedule entry
+        payout = PayoutSchedule(
+            payout_date=payout_date,
+            recipient_id=member.user_id,
+            group_id=group_id
+        )
+
+        db.session.add(payout)
+    print(f"Created payout for user {member.user_id} on {payout_date}")
+    # Save all payout schedules to database
     db.session.commit()
 
 def build_breadcrumbs(*items):
@@ -83,6 +121,38 @@ def join_group(group_id):
     flash("Joined group successfully!", "success")
     return redirect(url_for('main.dashboard'))
 
+
+@main.route('/generate_payouts/<int:group_id>', methods=['POST'])
+@login_required
+# this function is responsible for assigning and generating payout schedule
+def generate_payouts(group_id):
+
+    group = Group.query.get_or_404(group_id)
+
+    # security check
+    if group.owner_id != current_user.id:
+        flash("You are not authorized to generate payouts for this group.", "warning")
+        return redirect(url_for('main.dashboard'))
+
+    assign_payouts(group_id)
+    generate_payout_schedule(group_id)
+
+    flash("Payout schedule generated!", "success")
+    return jsonify({
+        "success": True,
+        "message": "Payout schedule generated"
+    })
+
+
+@main.route('/group_details/<int:group_id>')
+@login_required
+def group_details(group_id):
+
+    group = Group.query.get_or_404(group_id)
+
+    return render_template('group_details.html', group=group)
+
+
 # Creates a new savings group and adds creator as first member
 @main.route('/create_group', methods=['GET', 'POST'])
 @login_required
@@ -98,7 +168,8 @@ def create_group():
 
         group = Group(
             name = name,
-            contribution_amount=float(amount)
+            contribution_amount=float(amount),
+            owner_id = current_user.id
         )
 
         db.session.add(group)
@@ -114,8 +185,6 @@ def create_group():
         db.session.add(membership)
         db.session.commit()
 
-        assign_payouts(group.id)   # generate randomized payout order
-
         flash("Group created", "success")
         return redirect(url_for('main.dashboard'))
 
@@ -127,6 +196,27 @@ def create_group():
 
     return render_template(
         'create_group.html', breadcrumb=bredcrumbs)
+
+@main.route("/delete_group/<int:group_id>", methods=["POST"])
+@login_required
+def delete_group(group_id):
+    print("DELETE HIT") # debug
+    group = Group.query.get_or_404(group_id)
+
+    #security check
+    if group.owner_id != current_user.id:
+        abort(403)
+
+    # force detach relationships first
+    GroupMember.query.filter_by(group_id=group.id).delete()
+    PayoutSchedule.query.filter_by(group_id=group_id).delete()
+
+    db.session.delete(group)
+    db.session.commit()
+    db.session.expire_all()
+
+    return jsonify({"Success": True})
+
 
 #user registration flow
 @main.route('/register', methods=['GET', 'POST'])
@@ -189,13 +279,14 @@ def login():
 @main.route('/logout')
 @login_required
 def logout():
+
     logout_user()
     session.clear()
 
     # force cookie reset
-    response = redirect(url_for('main.login'))
-    response.delete_cookie('session')
-    return response
+    # response = redirect(url_for('main.login'))
+    # response.delete_cookie('session')
+     #return response
     # response.set_cookie('session', '', expires=0)
     flash('You have been logged out.', 'success')
 

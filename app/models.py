@@ -61,8 +61,9 @@ class Group(db.Model):
     contribution_amount = db.Column(db.Float, nullable=False)      # Amount each member contributes per cycle
     payout_frequency_days = db.Column(db.Integer, default=14) # defines payout cycle frequency
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    members = db.relationship('GroupMember', back_populates='group')      # All members in this group via GroupMember table
-    payouts = db.relationship('PayoutSchedule', backref='group', lazy=True)     # Payout schedule entries for this group
+    owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    members = db.relationship('GroupMember', back_populates='group', cascade="all, delete-orphan")      # All members in this group via GroupMember table
+    payouts = db.relationship('PayoutSchedule', backref='group', lazy=True, cascade="all, delete-orphan")     # Payout schedule entries for this group
 
     def __repr__(self):
         return f"<Group {self.name}>"

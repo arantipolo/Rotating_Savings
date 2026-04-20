@@ -27,9 +27,13 @@
     {% if memberships %}
          <!-- Loop through all groups the user belongs to -->
         {% for membership in memberships %}
-            <div class="group-card">
+            <div id="group-{{ membership.group.id }}" class="group-card">
             <!-- Group identity -->
                 <h3>Group: {{ membership.group.name }}</h3>
+
+                <button class="btn-secondary" onclick="openModal({{ membership.group.id }})">
+                    View Details
+                </button>
                 <!-- Financial contribution per cycle -->
                 <p><strong>Contribution:</strong> {{ membership.group.contribution_amount }}</p>
                <!-- When the group was created -->
@@ -51,6 +55,18 @@
             </div>
             <hr>
         {% endfor %}
+
+        <div id="groupModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeModal()">&times;</span>
+
+                <h2>Group Details</h2>
+
+                <div id="modal-body">
+                    <!-- content loads here -->
+                </div>
+            </div>
+        </div>
     {% else %}
         <!-- Message shown when user has no group memberships -->
         <p>You are not in any groups yet.</p>
@@ -61,3 +77,5 @@
     <a href="{{ url_for('main.logout') }}" class="buttons">Logout</a>
 </div>
 {% endblock %}
+
+
