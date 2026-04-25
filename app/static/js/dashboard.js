@@ -25,6 +25,7 @@ function generatePayouts(groupId) {
             alert("Payout schedule generated!");
 
             openModal(groupId);  // reload modal so the new data shows up
+            location.reload();
             closeModal();
         })
         .catch(err => console.error(err));

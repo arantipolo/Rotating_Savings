@@ -3,12 +3,12 @@
 <table border="1" width="100%">
     <tr>
         <th>Member</th>
-        <th>Position</th>
+        <th>Position</th>  {#order of payout#}
         <th>Status</th>
-        <th>Payout Date</th> {#order of payout#}
+        <th>Payout Date</th>
     </tr>
 
-    {% for member in group.members %}
+    {% for member in members %}
     <tr>
         <td>{{ member.user.full_name }}</td>
 
@@ -17,23 +17,23 @@
             {{  member.payout_position if member.payout_position else "Not assigned" }}
         </td>
 
-        {# find this member's payout schedule entry #}
-
-        <td>
-             {# match payout record for this user #}
-            {% set payout = group.payouts | selectattr("recipient_id", "equalto", member.user_id) | first %}
-
-            {# show date if it exists, otherwise leave blank #}
-            {{ payout.payout_date if payout else "-" }}
-        </td>
-
-              <!-- simple paid status flag-->
+        {#  paid status flag #}
         <td>
             {% if member.has_received %}
                 ✅ Paid
             {% else %}
                 ⏳ Waiting
             {% endif %}
+        </td>
+
+        <td>
+             {# match payout record for this user #}
+            {% set payout = group.payouts
+                    | selectattr("recipient_id", "equalto", member.user_id)
+                    | sort(attribute="payout_date")
+                    | first %}
+            {# show date if it exists, otherwise leave blank #}
+            {{ payout.payout_date if payout else "-" }}
         </td>
 
 {#        <td>#}

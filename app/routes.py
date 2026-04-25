@@ -23,8 +23,10 @@ def debug_session():
 #instead of assigning pure randomness, this method look at how reliable each user based on past behaviour (ontime or late payment)
 # Also reduces priority for users who have already received payouts
 def assign_payouts(group_id):
-
-    members = GroupMember.query.filter_by(group_id=group_id).all() # get all group members
+    # get all group members and fix ordering.
+    members = GroupMember.query.filter_by(group_id=group_id)\
+        .order_by(GroupMember.payout_position.asc())\
+        .all()
 
     scored_members = []  # this list will store tuples of (member, calculated_score)
 
@@ -49,7 +51,7 @@ def assign_payouts(group_id):
         priority_score = reliability * fairness_multiplier * random_factor
 
         #store the results for sorting later
-        scored_members.append({member, priority_score})
+        scored_members.append((member, priority_score))
 
     def get_score(item): # here, item is a tuple (member, score)
         return item[1]   # return the score which is the second value from the tuple
@@ -95,7 +97,8 @@ def generate_payout_schedule(group_id):
         payout = PayoutSchedule(
             payout_date=payout_date,
             recipient_id=member.user_id,
-            group_id=group_id
+            group_id=group_id,
+            cycle_number=member.payout_position
         )
 
         db.session.add(payout)
@@ -190,6 +193,42 @@ def generate_payouts(group_id):
         "message": "Payout schedule generated"
     })
 
+@main.route("/mark_payout/<int:payout_id>/<int:user_id>", methods=['POST'])
+@login_required
+def mark_payout(payout_id, user_id):
+    # This route is used by the group owner to confirm that a payout has been completed for a specific user
+    # It connects the payout cycle with user status updates and esures fairness tracking works corectly
+
+    payout = PayoutSchedule.query.get_or_404(payout_id) # Get payout record
+
+    group = Group.query.get_or_404(payout.group_id)  # get the group for security check
+
+    if group.owner_id != current_user.id:  #Only group owner can mark a payout as completed
+        abort(403)   # prevents unauthorized access
+
+    # Find the group membership record for this user
+    member = GroupMember.query.filter_by(
+        user_id=user_id,
+        group_id=group.id
+    ).first()
+
+    if not member:
+        return jsonify({"error": "Member not found"}), 404
+
+    member.has_received = True  # This marks that this member has received their payout
+
+    if hasattr(member.user, "reliability_score") and member.user.reliability_score:
+        member.user.reliability_score += 0.1
+    else:
+        member.user.reliability_score = 1.0
+
+    db.session.commit()
+
+    return jsonify({
+        "success": True,
+        "message": "Payout marked as completed"
+    })
+
 
 @main.route('/group_details/<int:group_id>')
 @login_required
@@ -197,7 +236,11 @@ def group_details(group_id):
 
     group = Group.query.get_or_404(group_id)
 
-    return render_template('group_details.html', group=group)
+    #sorted members
+    members = GroupMember.query.filter_by(group_id=group_id)\
+        .order_by(GroupMember.payout_position.asc())\
+        .all()
+    return render_template('group_details.html', group=group, members=members)
 
 
 # Creates a new savings group and adds creator as first member
