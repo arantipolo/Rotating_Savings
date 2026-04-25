@@ -3,31 +3,59 @@
 <table border="1" width="100%">
     <tr>
         <th>Member</th>
-        <th>Payout Date</th>
-        <th>Paid?</th>
+        <th>Position</th>
+        <th>Status</th>
+        <th>Payout Date</th> {#order of payout#}
     </tr>
 
     {% for member in group.members %}
     <tr>
         <td>{{ member.user.full_name }}</td>
 
+        {#payout position#}
         <td>
+            {{  member.payout_position if member.payout_position else "Not assigned" }}
+        </td>
+
+        {# find this member's payout schedule entry #}
+
+        <td>
+             {# match payout record for this user #}
             {% set payout = group.payouts | selectattr("recipient_id", "equalto", member.user_id) | first %}
+
+            {# show date if it exists, otherwise leave blank #}
             {{ payout.payout_date if payout else "-" }}
         </td>
 
+              <!-- simple paid status flag-->
         <td>
             {% if member.has_received %}
-                ✅
+                ✅ Paid
             {% else %}
-                ❌
+                ⏳ Waiting
             {% endif %}
         </td>
+
+{#        <td>#}
+{#            {% if payout %}#}
+{#                <form id="uploadForm-{{ payout.id }}" enctype="multipart/form-data">#}
+{#                    <input type="file" name="file" />#}
+{#                    <button type="button" onclick="uploadProof({{ payout.id }})">#}
+{#                        Upload Proof#}
+{#                    </button>#}
+{#                </form>#}
+{#            {% else %}#}
+{#                -#}
+{#            {% endif %}#}
+{#        </td>#}
+
     </tr>
     {% endfor %}
 </table>
 
 <br>
+
+{# Only group owner can generate payout schedule#}
 {% if group.owner_id == current_user.id %}
 <button class="btn-primary" onclick="generatePayouts({{ group.id }})">
     Generate Payout Schedule
@@ -39,3 +67,5 @@
     Delete Group
 </button>
 {% endif %}
+
+{# https://emojidb.org/website-emojis #}

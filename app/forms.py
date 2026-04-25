@@ -5,9 +5,9 @@ from wtforms.validators import DataRequired, Email, EqualTo
 # Handles new user account creation with validation
 # Ensures data integrity before saving to database
 class RegistrationForm(FlaskForm):
-    full_name = StringField('Full Name', validators=[DataRequired()])      # User's full name (required field)
+    full_name = StringField('Full Name', validators=[DataRequired()])      # User's full name
     email = StringField('Email', validators=[DataRequired(), Email()])      # Email must be valid format and cannot be empty
-    password = PasswordField('Password', validators=[DataRequired()])       # Password input (stored securely after hashing in backend)
+    password = PasswordField('Password', validators=[DataRequired()])       # Password input
     confirm_password = PasswordField('Confirm Password',
                                      validators=[DataRequired(), EqualTo('password')])      # Ensures user correctly confirms password entry
 

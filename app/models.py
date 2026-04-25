@@ -15,7 +15,7 @@ class GroupMember(db.Model):
     )
     id = db.Column(db.Integer, primary_key=True)
 
-    # Foreign keys linking user ↔ group relationship
+    # Foreign keys linking user to group relationship
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     group_id = db.Column(db.Integer, db.ForeignKey('group.id'), nullable=False)
     payout_position = db.Column(db.Integer)     # Order in which user receives payout (assigned randomly)
@@ -43,6 +43,10 @@ class User(UserMixin, db.Model):
     # Tracks payouts this user has received
     payouts_received = db.relationship('PayoutSchedule', foreign_keys='PayoutSchedule.recipient_id',
                                        backref='recipient')
+    # this is a score to represent a user's reliability in making payments
+    # default starts a 1.0 and can go up or down based on behaviour
+    reliability_score =db.Column(db.Float, default=1.0)
+
     # Hash password before storing in database
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -75,7 +79,7 @@ class PayoutSchedule(db.Model):
     recipient_id = db.Column(db.Integer, db.ForeignKey('user.id'))     # Who receives the payout in this cycle
     group_id = db.Column(db.Integer, db.ForeignKey('group.id'))      # Group this payout belongs to
     payments = db.relationship('Payment', backref='payout', lazy=True)     # Payments linked to this payout cycle
-
+    cycle_number = db.Column(db.Integer, nullable=False)  # This represents which cycle this payout to, example, 1st round, 2nd round, etc...
 
     def __repr__(self):
         return f"<Payout {self.payout_date}>"
@@ -88,8 +92,9 @@ class Payment(db.Model):
     payer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False) # who made the payment
     payout_id = db.Column(db.Integer, db.ForeignKey('payout_schedule.id'), nullable=False)     # Which payout cycle this payment belongs to
     amount = db.Column(db.Float, nullable=False)
-    proof_image = db.Column(db.String(255))   # Optional proof of payment
+    proof_image = db.Column(db.String(255))   #proof of payment
     paid_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_on_time = db.Column(db.Boolean, default=True)  # This indicates if the payment was made before or on expected payout
 
     def __repr__(self):
         return f"<Payment {self.amount}>"
