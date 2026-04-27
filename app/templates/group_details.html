@@ -3,39 +3,121 @@
 <table border="1" width="100%">
     <tr>
         <th>Member</th>
+        <th>Position</th>  {#order of payout#}
+        <th>Status</th>
         <th>Payout Date</th>
-        <th>Paid?</th>
+        <th>Proof</th>
     </tr>
 
-    {% for member in group.members %}
+    {% for member in members %}
     <tr>
         <td>{{ member.user.full_name }}</td>
 
+        {#payout position#}
         <td>
-            {% set payout = group.payouts | selectattr("recipient_id", "equalto", member.user_id) | first %}
+            {{  member.payout_position if member.payout_position else "Not assigned" }}
+        </td>
+
+        {#  paid status flag #}
+        <td>
+            {% if member.has_received %}
+                ✅ Paid
+            {% else %}
+                ⏳ Waiting
+            {% endif %}
+        </td>
+
+        <td>
+             {# match payout record for this user #}
+            {% set payout = group.payouts
+                    | selectattr("recipient_id", "equalto", member.user_id)
+                    | sort(attribute="payout_date")
+                    | first %}
+            {# show date if it exists, otherwise leave blank #}
             {{ payout.payout_date if payout else "-" }}
         </td>
 
         <td>
-            {% if member.has_received %}
-                ✅
+            {% if payout and payout.proof_image %}
+                <button onclick="viewProof('{{ payout.proof_image }}')">
+                    View Proof
+                </button>
             {% else %}
-                ❌
+                -
             {% endif %}
         </td>
+
     </tr>
     {% endfor %}
 </table>
 
 <br>
+
+{# Only group owner can generate payout schedule#}
 {% if group.owner_id == current_user.id %}
 <button class="btn-primary" onclick="generatePayouts({{ group.id }})">
     Generate Payout Schedule
 </button>
 {% endif %}
 
+{# upload proof#}
+{# upload proof button ALWAYS visible #}
+{% if current_payout %}
+
+    {% if current_user.id == current_payout.recipient_id %}
+        <button class="btn-secondary" onclick="alert('This does not apply to you')">
+            Upload Proof
+        </button>
+    {% else %}
+        {% set current_payment = current_payout.payments
+            | selectattr("payer_id", "equalto", current_user.id)
+            | first %}
+
+        {% if current_payout %}
+            <button class="btn-secondary" onclick="openUploadModal({{ current_payout.id }})">
+                Upload Proof
+            </button>
+        {% else %}
+            <button class="btn-secondary" onclick="alert('No payment record found yet')">
+                Upload Proof
+            </button>
+        {% endif %}
+    {% endif %}
+
+{% endif %}
+
+{#Delete group#}
 {% if group.owner_id == current_user.id %}
 <button class="btn-danger" onclick="deleteGroup({{ group.id }})">
     Delete Group
 </button>
 {% endif %}
+
+<script>
+    window.currentUserId = {{ current_user.id }};
+</script>
+
+{#This modal pops up when the user clicks "upload proof" allowing the user to select a file and send it to backend#}
+
+<div id="uploadModal" class="modal" style="display:none;">
+    <div class="modal-content">
+        <span class="close" onclick="closeUploadModal()">
+            &times;
+        </span>
+
+        <h2>Upload Proof</h2>
+
+        <input type="file" id="proofFile"/>  {# file input for selecting image #}
+
+        <button onclick="submitProofUpload()">
+            Submit Proof
+        </button>
+
+        {# Debug #}
+        <div style="margin-top: 10px; fontSize: 12px; color:gray;">
+            Upload Debug:
+            <span id="uploadDebug">waiting..</span>
+        </div>
+    </div>
+</div>
+{# https://emojidb.org/website-emojis #}

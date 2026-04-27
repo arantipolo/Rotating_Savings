@@ -51,9 +51,13 @@ body {
 
 .buttons {
     font-size: 20px;
+    border: solid;
     background-color: white;
+    text-decoration: none;
     text-decoration-color: black;
     border-radius: 5px;
+
+
 }
 .buttons:hover {
     background-color: #30a505;

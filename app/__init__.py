@@ -8,9 +8,12 @@ db = SQLAlchemy()
 login = LoginManager()
 login.login_view = 'main.login'  # blueprint name.login route
 
+
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+
+    #app.config["UPLOAD_FOLDER"] = Config.UPLOAD_FOLDER
 
     # Initialize extensions
     db.init_app(app)
@@ -20,7 +23,10 @@ def create_app():
     from app.routes import main
     app.register_blueprint(main)
 
+    #print(app.url_map)
+
     # Import models AFTER db is initialized
+
     from app import models
 
     return app

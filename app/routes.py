@@ -1,25 +1,70 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session, jsonify, abort
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session, jsonify, abort, current_app
 from flask_login import login_user, logout_user, login_required, current_user
+from wtforms.validators import equal_to
+
 from app.forms import RegistrationForm, LoginForm
 from app.models import User, Group, GroupMember, PayoutSchedule, Payment
 from app import db
 from datetime import datetime, timedelta
-import random
+from werkzeug.utils import secure_filename
+import random, os
+
 
 main = Blueprint('main', __name__)
 
-# Randomly assigns payout positions to group members
-# This determines the order each member receives payouts
+@main.route('/debug-session')
+def debug_session():
+    return {
+        "authenticated": current_user.is_authenticated,
+        "user_id": current_user.get_id()
+    }
+
+# Assign payout positions using a weighted random approach.
+#instead of assigning pure randomness, this method look at how reliable each user based on past behaviour (ontime or late payment)
+# Also reduces priority for users who have already received payouts
 def assign_payouts(group_id):
-    members = GroupMember.query.filter_by(group_id=group_id).all()
+    # get all group members and fix ordering.
+    members = GroupMember.query.filter_by(group_id=group_id)\
+        .order_by(GroupMember.payout_position.asc())\
+        .all()
 
-    positions = list(range(1, len(members) + 1)) # Create sequential positions
-    random.shuffle(positions)  # Shuffle to randomize payout order
+    scored_members = []  # this list will store tuples of (member, calculated_score)
 
-    for member, pos in zip(members, positions):  # Assign each member a payout position
-        member.payout_position = pos
+    for member in members:
+        user = member.user # get the actual user object linked to this membership
 
-    # Save changes to database
+        # This value increases if user pays on time, otherwise decreases if late
+        reliability = user.reliability_score if user.reliability_score else 1.0
+
+        # fairness adjustment
+        #if user already received payout before, reduce their priority
+        # This prevents the same user from being early in the payout order
+        if member.has_received:
+            fairness_multiplier = 0.5
+        else:
+            fairness_multiplier = 1.0
+
+        # Include random factor
+        random_factor = random.uniform(0.8, 1.2)
+
+        #final score calculation, the higher the score, the earlier the user is in the payout order
+        priority_score = reliability * fairness_multiplier * random_factor
+
+        #store the results for sorting later
+        scored_members.append((member, priority_score))
+
+    def get_score(item): # here, item is a tuple (member, score)
+        return item[1]   # return the score which is the second value from the tuple
+
+    # Sort members based on score (highest first)
+    scored_members.sort(key=get_score, reverse=True)
+
+    # Assign payout positions based on sorted order
+    for index, (member, score) in enumerate(scored_members):
+
+        #position starts at 1
+        member.payout_position = index + 1
+    #save all updates to the database
     db.session.commit()
 
 # Generates payout dates for each member
@@ -52,13 +97,18 @@ def generate_payout_schedule(group_id):
         payout = PayoutSchedule(
             payout_date=payout_date,
             recipient_id=member.user_id,
-            group_id=group_id
+            group_id=group_id,
+            cycle_number=member.payout_position
         )
 
         db.session.add(payout)
     print(f"Created payout for user {member.user_id} on {payout_date}")
     # Save all payout schedules to database
     db.session.commit()
+
+#helper function to validate uploaded file types for payment proof uploads
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in {"png", "jpg", "jpeg", "gif"}
 
 def build_breadcrumbs(*items):
     return [{"label": label, "url": url} for label, url in items]
@@ -126,21 +176,151 @@ def join_group(group_id):
 @login_required
 # this function is responsible for assigning and generating payout schedule
 def generate_payouts(group_id):
+    #fetch the group using the id from the url
+    #returns a 404 if group doesnt exist.
+    group = Group.query.get(group_id)
 
-    group = Group.query.get_or_404(group_id)
+    # sort the group members
+    members = sorted(group.members, key=lambda member: member.user_id)
 
-    # security check
-    if group.owner_id != current_user.id:
-        flash("You are not authorized to generate payouts for this group.", "warning")
-        return redirect(url_for('main.dashboard'))
+    # this prevents generating duplicates
+    existing = PayoutSchedule.query.filter_by(group_id=group.id).all()
+    if existing:
+        return jsonify({"error": "Payouts already generated!"}), 400
 
-    assign_payouts(group_id)
-    generate_payout_schedule(group_id)
+    payouts = []
 
-    flash("Payout schedule generated!", "success")
+    # Each member will get exactly one turn in the rotation
+    for i, recipient in enumerate(members):
+
+        payout = PayoutSchedule(
+            group_id = group.id,
+            recipient_id = recipient.user_id,
+            cycle_number = i + 1
+        )
+
+        db.session.add(payout)
+        db.session.append(payout)
+
+    # flush to make sure id exist before using it
+    db.session.flush()
+
+    # for each payout, everyone contributes except the recipient
+    for payout in payouts:
+        for member in members:
+
+            #this will skip the current recipient
+            if member.user_id == payout.recipient_id:
+                continue;
+
+            payment = Payment(
+                group_id = group.id,
+                payer_id = member.user_id,
+                payout_id = payout.id,
+                amount = group.contribution_amount
+            )
+
+            db.session.add(payment)
+
+    # commit everything togeter
+    db.session.commit()
+
+    return jsonify({
+        "message": "Payouts generated successfully!",
+        "total_payouts": len(payouts),
+        "total_members": len(members)
+    }), 200
+
+    # # only group owner is allowed to generate payouts
+    # if group.owner_id != current_user.id:
+    #     flash("You are not authorized to generate payouts for this group.", "warning")
+    #
+    #     return jsonify({
+    #         "success": False,
+    #         "message": "Not authorized"
+    #     }), 403
+    #
+    #
+    # assign_payouts(group_id)   # assign payout order
+    #
+    # generate_payout_schedule(group_id)   # generate schedule
+    #
+    # # Get all payouts
+    # payouts = PayoutSchedule.query.filter_by(group_id=group_id).all()
+    #
+    #
+    # flash("Payout schedule generated!", "success")
+    #
+    # print("----PAYOUTS CREATED----")
+    # for p in payouts:
+    #     print(f"payout_id={p.id}, recipient={p.recipient_id}")
+    #
+    # print("--- CREATING PAYMENTS---")
+    #
+    # # create payment records
+    # for payout in payouts:
+    #     for member in group.members:
+    #
+    #         # skip if this member is the one receiving payout
+    #         if member.user_id == payout.recipient_id:
+    #             continue
+    #
+    #         existing = Payment.query.filter_by(
+    #             payer_id=member.user_id,
+    #             payout_id=payout.id
+    #         ).first()
+    #
+    #         if not existing:
+    #             print(f"Creating payments: payer={member.user_id}, payout={payout.id}")
+    #
+    #             payment = Payment(
+    #                 payer_id=member.user_id,
+    #                 payout_id=payout.id,
+    #                 amount=group.contribution_amount,
+    #                 is_on_time=True
+    #             )
+    #
+    #             db.session.add(payment)
+    # db.session.commit()
+    #
+    # return jsonify({"Success": True})
+    #
+
+
+@main.route("/mark_payout/<int:payout_id>/<int:user_id>", methods=['POST'])
+@login_required
+def mark_payout(payout_id, user_id):
+    # This route is used by the group owner to confirm that a payout has been completed for a specific user
+    # It connects the payout cycle with user status updates and esures fairness tracking works corectly
+
+    payout = PayoutSchedule.query.get_or_404(payout_id) # Get payout record
+
+    group = Group.query.get_or_404(payout.group_id)  # get the group for security check
+
+    if group.owner_id != current_user.id:  #Only group owner can mark a payout as completed
+        abort(403)   # prevents unauthorized access
+
+    # Find the group membership record for this user
+    member = GroupMember.query.filter_by(
+        user_id=user_id,
+        group_id=group.id
+    ).first()
+
+    if not member:
+        return jsonify({"error": "Member not found"}), 404
+
+    member.has_received = True  # This marks that this member has received their payout
+
+    if hasattr(member.user, "reliability_score") and member.user.reliability_score:
+        member.user.reliability_score += 0.1
+    else:
+        member.user.reliability_score = 1.0
+
+    db.session.commit()
+
     return jsonify({
         "success": True,
-        "message": "Payout schedule generated"
+        "message": "Payout marked as completed"
     })
 
 
@@ -150,7 +330,24 @@ def group_details(group_id):
 
     group = Group.query.get_or_404(group_id)
 
-    return render_template('group_details.html', group=group)
+    #sorted members by payout position
+    members = GroupMember.query.filter_by(group_id=group_id)\
+        .order_by(GroupMember.payout_position.asc())\
+        .all()
+
+    #get today's date
+    today = datetime.utcnow().date()
+
+    #find the current payout
+    current_payout = (
+        PayoutSchedule.query.filter(
+            PayoutSchedule.group_id == group_id,
+            PayoutSchedule.payout_date >= today
+        )
+        .order_by(PayoutSchedule.payout_date.asc())
+        .first()
+    )
+    return render_template('group_details.html', group=group, members=members, current_payout=current_payout)
 
 
 # Creates a new savings group and adds creator as first member
@@ -217,6 +414,116 @@ def delete_group(group_id):
 
     return jsonify({"Success": True})
 
+print("ROUTES LOADED")
+# Handles uploading proof of payment (image file) for a specific payment record
+@main.route("/upload_proof/<int:payment_id>", methods=["POST"])
+@login_required
+def upload_proof(payment_id):
+
+    print("\n----[UPLOAD] START----]")
+    print("[UPLOAD] Payment ID:", payment_id)
+
+    # Find the payment record for this user and payout
+    # This ensures users can only upload for their own payment
+    payment = Payment.query.filter_by(
+        payout_id=payment_id,
+        payer_id=current_user.id
+    ).first()
+
+    if not payment:
+        print("[UPLOAD] ERROR: Payment not found")
+        return jsonify({"error": "Payment record not found"}), 404
+
+    # get the file from request
+    file = request.files.get("file")
+
+    print("[UPLOAD] File received:", file)
+
+    if not file:
+        print("[UPLOAD] ERROR: No file in request")
+        return jsonify({"error": "No file received"}), 400
+
+    if file.filename == "":
+        print("[UPLOAD] ERROR: Empty filename")
+        return jsonify({"error": "No selected file"}), 400
+
+    # secure file name to prevent weird chars or path attacks
+    filename = secure_filename(file.filename)
+
+    # build the path to upload folder
+    upload_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
+
+    print("[UPLOAD] Saving file to:", upload_path)
+
+    # Save file to disk
+    file.save(upload_path)
+
+    #Store filename in database
+    payment.proof_image = filename
+    db.session.commit()
+
+    print("[UPLOAD] File saved + DB updated")
+
+    return jsonify({
+        "success": True,
+        "message": "Upload Successful",
+        "filename": filename
+    })
+
+
+@main.route("/submit_payment/<int:payout_id>", methods=["POST"])
+@login_required
+def submit_payment(payout_id):
+    # This creates a Payment record and evaluates whether the payment
+    #  was made on time, which will later affect the user's reliability score.
+    payout = PayoutSchedule.query.get_or_404(payout_id)
+
+    # This prevents paying yourself
+    if payout.recipient_id == current_user.id:
+        return jsonify({"error": "You cannot pay yourself"}), 400
+
+    # Check if user already submitted payment for this payout
+    existing_payment = Payment.query.filter_by(
+        payer_id=current_user.id,
+        payout_id=payout.id
+    ).first()
+
+    if existing_payment:
+        return jsonify({"error": "Payment already submitted"}), 400
+
+    # This determines if payment is made on time
+    today = datetime.utcnow().date()
+    is_on_time = today <= payout.payout_date
+
+    #This creates payment record
+    payment = Payment(
+        payer_id = current_user.id,
+        payout_id = payout.id,
+        amount = payout.group.contribution_amount,
+        is_on_time = is_on_time
+    )
+
+    db.session.add(payment)
+
+    #reliability score adjustment
+    if is_on_time:
+        #reward consistency
+        current_user.reliability_score += 0.05
+    else:
+        # Penalize lateness
+        current_user.reliability_score -= 0.1
+
+    # clamp values so they dont go crazy
+    current_user.reliability_score = max(0.5, min(current_user.reliability_score, 2.0))
+
+    db.session.commit()
+
+    return jsonify({
+        "success": True,
+        "message": "Payment submitted successfully",
+        "on_time": is_on_time
+    })
+
 
 #user registration flow
 @main.route('/register', methods=['GET', 'POST'])
@@ -230,6 +537,8 @@ def register():
         )
         user.set_password(form.password.data)
 
+        pwd = user.check_password(form.password.data)
+        confirmPassword = form.confirm_password.data
         db.session.add(user)
         db.session.commit()
 
