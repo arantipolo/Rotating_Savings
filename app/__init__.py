@@ -23,6 +23,8 @@ def create_app():
     from app.routes import main
     app.register_blueprint(main)
 
+    #print(app.url_map)
+
     # Import models AFTER db is initialized
 
     from app import models

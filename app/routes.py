@@ -176,22 +176,116 @@ def join_group(group_id):
 @login_required
 # this function is responsible for assigning and generating payout schedule
 def generate_payouts(group_id):
+    #fetch the group using the id from the url
+    #returns a 404 if group doesnt exist.
+    group = Group.query.get(group_id)
 
-    group = Group.query.get_or_404(group_id)
+    # sort the group members
+    members = sorted(group.members, key=lambda member: member.user_id)
 
-    # security check
-    if group.owner_id != current_user.id:
-        flash("You are not authorized to generate payouts for this group.", "warning")
-        return redirect(url_for('main.dashboard'))
+    # this prevents generating duplicates
+    existing = PayoutSchedule.query.filter_by(group_id=group.id).all()
+    if existing:
+        return jsonify({"error": "Payouts already generated!"}), 400
 
-    assign_payouts(group_id)
-    generate_payout_schedule(group_id)
+    payouts = []
 
-    flash("Payout schedule generated!", "success")
+    # Each member will get exactly one turn in the rotation
+    for i, recipient in enumerate(members):
+
+        payout = PayoutSchedule(
+            group_id = group.id,
+            recipient_id = recipient.user_id,
+            cycle_number = i + 1
+        )
+
+        db.session.add(payout)
+        db.session.append(payout)
+
+    # flush to make sure id exist before using it
+    db.session.flush()
+
+    # for each payout, everyone contributes except the recipient
+    for payout in payouts:
+        for member in members:
+
+            #this will skip the current recipient
+            if member.user_id == payout.recipient_id:
+                continue;
+
+            payment = Payment(
+                group_id = group.id,
+                payer_id = member.user_id,
+                payout_id = payout.id,
+                amount = group.contribution_amount
+            )
+
+            db.session.add(payment)
+
+    # commit everything togeter
+    db.session.commit()
+
     return jsonify({
-        "success": True,
-        "message": "Payout schedule generated"
-    })
+        "message": "Payouts generated successfully!",
+        "total_payouts": len(payouts),
+        "total_members": len(members)
+    }), 200
+
+    # # only group owner is allowed to generate payouts
+    # if group.owner_id != current_user.id:
+    #     flash("You are not authorized to generate payouts for this group.", "warning")
+    #
+    #     return jsonify({
+    #         "success": False,
+    #         "message": "Not authorized"
+    #     }), 403
+    #
+    #
+    # assign_payouts(group_id)   # assign payout order
+    #
+    # generate_payout_schedule(group_id)   # generate schedule
+    #
+    # # Get all payouts
+    # payouts = PayoutSchedule.query.filter_by(group_id=group_id).all()
+    #
+    #
+    # flash("Payout schedule generated!", "success")
+    #
+    # print("----PAYOUTS CREATED----")
+    # for p in payouts:
+    #     print(f"payout_id={p.id}, recipient={p.recipient_id}")
+    #
+    # print("--- CREATING PAYMENTS---")
+    #
+    # # create payment records
+    # for payout in payouts:
+    #     for member in group.members:
+    #
+    #         # skip if this member is the one receiving payout
+    #         if member.user_id == payout.recipient_id:
+    #             continue
+    #
+    #         existing = Payment.query.filter_by(
+    #             payer_id=member.user_id,
+    #             payout_id=payout.id
+    #         ).first()
+    #
+    #         if not existing:
+    #             print(f"Creating payments: payer={member.user_id}, payout={payout.id}")
+    #
+    #             payment = Payment(
+    #                 payer_id=member.user_id,
+    #                 payout_id=payout.id,
+    #                 amount=group.contribution_amount,
+    #                 is_on_time=True
+    #             )
+    #
+    #             db.session.add(payment)
+    # db.session.commit()
+    #
+    # return jsonify({"Success": True})
+    #
+
 
 @main.route("/mark_payout/<int:payout_id>/<int:user_id>", methods=['POST'])
 @login_required
@@ -236,11 +330,24 @@ def group_details(group_id):
 
     group = Group.query.get_or_404(group_id)
 
-    #sorted members
+    #sorted members by payout position
     members = GroupMember.query.filter_by(group_id=group_id)\
         .order_by(GroupMember.payout_position.asc())\
         .all()
-    return render_template('group_details.html', group=group, members=members)
+
+    #get today's date
+    today = datetime.utcnow().date()
+
+    #find the current payout
+    current_payout = (
+        PayoutSchedule.query.filter(
+            PayoutSchedule.group_id == group_id,
+            PayoutSchedule.payout_date >= today
+        )
+        .order_by(PayoutSchedule.payout_date.asc())
+        .first()
+    )
+    return render_template('group_details.html', group=group, members=members, current_payout=current_payout)
 
 
 # Creates a new savings group and adds creator as first member
@@ -307,41 +414,62 @@ def delete_group(group_id):
 
     return jsonify({"Success": True})
 
-
+print("ROUTES LOADED")
 # Handles uploading proof of payment (image file) for a specific payment record
 @main.route("/upload_proof/<int:payment_id>", methods=["POST"])
 @login_required
 def upload_proof(payment_id):
 
-    # Get the payment record or fail if it doesn't exist
-    payment = Payment.query.get_or_404(payment_id)
+    print("\n----[UPLOAD] START----]")
+    print("[UPLOAD] Payment ID:", payment_id)
 
-    # Retrieve uploaded file from request
+    # Find the payment record for this user and payout
+    # This ensures users can only upload for their own payment
+    payment = Payment.query.filter_by(
+        payout_id=payment_id,
+        payer_id=current_user.id
+    ).first()
+
+    if not payment:
+        print("[UPLOAD] ERROR: Payment not found")
+        return jsonify({"error": "Payment record not found"}), 404
+
+    # get the file from request
     file = request.files.get("file")
 
-    # Basic validation: make sure a file was actually uploaded
-    if not file or file.filename == "":
-        return jsonify({"error": "No file provided"}), 400
+    print("[UPLOAD] File received:", file)
 
-    # Security check: only allow image file types (prevents malicious uploads)
-    if not allowed_file(file.filename):
-        return jsonify({"error": "Invalid file type"}), 400
+    if not file:
+        print("[UPLOAD] ERROR: No file in request")
+        return jsonify({"error": "No file received"}), 400
 
-    # Secure filename to prevent path injection or weird file names
+    if file.filename == "":
+        print("[UPLOAD] ERROR: Empty filename")
+        return jsonify({"error": "No selected file"}), 400
+
+    # secure file name to prevent weird chars or path attacks
     filename = secure_filename(file.filename)
 
-    # Build full file path using configured upload folder
-    path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
+    # build the path to upload folder
+    upload_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
 
-    # Save file to server
-    file.save(path)
+    print("[UPLOAD] Saving file to:", upload_path)
 
-    # Store filename in database so we can display/download later
+    # Save file to disk
+    file.save(upload_path)
+
+    #Store filename in database
     payment.proof_image = filename
     db.session.commit()
 
-    # Return success response for frontend (AJAX)
-    return jsonify({"success": True, "filename": filename})
+    print("[UPLOAD] File saved + DB updated")
+
+    return jsonify({
+        "success": True,
+        "message": "Upload Successful",
+        "filename": filename
+    })
+
 
 @main.route("/submit_payment/<int:payout_id>", methods=["POST"])
 @login_required
