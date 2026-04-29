@@ -16,8 +16,15 @@
      - Join existing groups -->
 <div class="dashboard-actions card">
     <h2>Quick Actions</h2>
-        <a href="{{ url_for('main.create_group') }}" class="buttons">Create Group</a>
-        <a href="{{ url_for('main.groups') }}" class="buttons">Join Group</a>
+        <div class="button-column">
+    <a href="{{ url_for('main.create_group') }}" class="btn btn-primary btn-full">
+        Create Group
+    </a>
+
+    <a href="{{ url_for('main.groups') }}" class="btn btn-secondary btn-full">
+        Join Group
+    </a>
+</div>
 </div>
 
     <!-- Displays all groups the user is currently a member of -->
@@ -27,32 +34,51 @@
     {% if memberships %}
          <!-- Loop through all groups the user belongs to -->
         {% for membership in memberships %}
-            <div id="group-{{ membership.group.id }}" class="group-card">
-            <!-- Group identity -->
-                <h3>Group: {{ membership.group.name }}</h3>
 
-                <button class="btn-secondary" onclick="openModal({{ membership.group.id }})">
-                    View Details
-                </button>
-                <!-- Financial contribution per cycle -->
-                <p><strong>Contribution:</strong> {{ membership.group.contribution_amount }}</p>
-               <!-- When the group was created -->
-                <p><strong>Created:</strong> {{ membership.group.created_at.strftime('%Y-%m-%d') }}</p>
-               <!-- Number of members in group -->
-                <p><strong>Members:</strong> {{ membership.group.members|length }} member(s)</p>
-               <!-- Randomly assigned payout order position -->
-                <p><strong>Your Position:</strong>
-                    {{ membership.payout_position if membership.payout_position else "Not assigned" }}
-                </p>
-                    <!-- Shows whether user has received their payout -->
-                <p><strong>Status:</strong>
-                    {% if membership.has_received %}
-                        <span style="color: green;"><strong>Received payout</strong></span>
-                    {% else %}
-                        <span style="color: orange;"><strong>Waiting for payout</strong></span>
-                    {% endif %}
-                </p>
+            <div id="group-{{ membership.group.id }}" class="group-card">
+
+                    <!-- Header row -->
+                    <div class="group-header">
+                        <h3 class="group-title">Group {{ membership.group.name }}</h3>
+
+                        <button class="btn btn-secondary" onclick="openModal({{ membership.group.id }})">
+                            View
+                        </button>
+                    </div>
+
+                    <!-- Info section -->
+                    <div class="group-meta">
+
+                        <div class="meta-item">
+                            💰 {{ membership.group.contribution_amount }}
+                        </div>
+
+                        <div class="meta-item">
+                            📅 {{ membership.group.created_at.strftime('%Y-%m-%d') }}
+                        </div>
+
+                        <div class="meta-item">
+                            👥 {{ membership.group.members|length }} members
+                        </div>
+
+                        <div class="meta-item">
+                            📍 Position: {{ membership.payout_position if membership.payout_position else "N/A" }}
+                        </div>
+
+                    </div>
+
+                    <!-- Status -->
+                    <div class="status {% if membership.has_received %}done{% else %}waiting{% endif %}">
+                        {% if membership.has_received %}
+                            ✔ Received payout
+                        {% else %}
+                            ⏳ Waiting for payout
+                        {% endif %}
+                    </div>
+
             </div>
+
+
             <hr>
         {% endfor %}
 
@@ -65,6 +91,7 @@
                 <div id="modal-body">
                     <!-- content loads here -->
                 </div>
+
             </div>
         </div>
     {% else %}

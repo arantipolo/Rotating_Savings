@@ -1,17 +1,52 @@
+/* =========================
+   BASE RESET
+========================= */
+* {
+    text-decoration: none;
+}
+
 body {
     font-family: Arial, sans-serif;
     margin: 0;
-    background-color: #f4f6f9;
+    background: #f3f6f4;
+    color: #1f2a1f;
 }
 
+
+/* =========================
+   LAYOUT SYSTEM
+========================= */
+
+/* global page centering system */
+.page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* main content wrapper */
+.container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 40px 20px;
+}
+
+
+/* =========================
+   NAVBAR
+========================= */
+
 .navbar {
-    background-color: #30a505;
-    padding: 15px 0;
+    background: #1f3b1f;
+    padding: 14px 0;
 }
 
 .nav-container {
-    width: 80%;
+    width: 85%;
     margin: auto;
+
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -19,93 +54,344 @@ body {
 
 .logo {
     color: white;
-}
-
-.nav-links {
-    list-style: none;
-    display: flex;
-    gap: 20px;
-}
-
-.nav-links li a {
-    text-decoration: none;
-    color: white;
     font-weight: bold;
 }
 
-.nav-links li a:hover {
-    color: #1abc9c;
+.nav-links {
+    display: flex;
+    gap: 18px;
+    list-style: none;
 }
 
-.container {
-    width: 80%;
-    margin: 40px auto;
-}
-
-.card {
-    background: white;
-    padding: 30px;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.buttons {
-    font-size: 20px;
-    border: solid;
-    background-color: white;
+.nav-links a {
+    color: white;
     text-decoration: none;
-    text-decoration-color: black;
-    border-radius: 5px;
-
-
-}
-.buttons:hover {
-    background-color: #30a505;
-    text-decoration-color: white;
+    font-weight: 600;
 }
 
-.buttons a {
-    text-decoration-line: none;
+.nav-links a:hover {
+    color: #7bd67b;
 }
 
-.flash {
-    padding: 10px;
-    margin: 10px 0;
-    border-radius: 5px;
+
+/* =========================
+   DASHBOARD
+========================= */
+
+.dashboard-actions {
+    display: flex;
+    flex-direction: column;
+    justify-content: normal;
+    gap: 12px;
+}
+
+.user-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+
+/* =========================
+   CARD SYSTEM
+========================= */
+
+.card,
+.form-card,
+.modal-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    background: white;
+    padding: 24px;
+    border-radius: 14px;
+
+    box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+
+    width: 70%;
+}
+
+
+/* =========================
+   GROUP CARD
+========================= */
+
+.group-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    padding: 18px;
+    border-radius: 12px;
+    background: white;
+
+    border: 1px solid #e6e6e6;
+    transition: 0.2s ease;
+}
+
+.group-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+}
+
+.group-header {
+    display: flex;
+    border-bottom: solid 1px gray;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.group-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1f3b1f;
+}
+
+.group-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 13px;
+    color: #555;
+}
+
+.meta-item {
+    background: #f1f3f1;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.status {
+    margin-top: 6px;
+    font-weight: 600;
+}
+
+.status.waiting {
+    color: #b7791f;
+}
+
+.status.done {
+    color: #2f8f2f;
+}
+
+
+/* =========================
+   FORMS
+========================= */
+
+.form-wrapper {
+    display: flex;
+    justify-content: center;
+    padding-top: 40px;
+    width: 100%;
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.field label {
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.field input {
+    padding: 11px;
+    border: 1px solid #d6ddd6;
+    border-radius: 8px;
+    outline: none;
+    transition: 0.2s ease;
+}
+
+.field input:focus {
+    border-color: #2f8f2f;
+    box-shadow: 0 0 0 3px rgba(47,143,47,0.12);
+}
+
+
+/* =========================
+   FORM HEADER
+========================= */
+
+.form-header {
+    display: flex;
+    justify-content: center;
+    margin-top: 30px;
+    margin-bottom: 10px;
+}
+
+.form-header h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
+    color: #1f3b1f;
+}
+
+
+/* =========================
+   BUTTON SYSTEM
+========================= */
+
+.btn {
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.btn-primary {
+    background: #2f8f2f;
     color: white;
 }
 
+.btn-primary:hover {
+    background: #257325;
+}
+
+.btn-danger {
+    background: #c62828;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #a91f1f;
+}
+
+.btn-secondary {
+    background: #e7efe7;
+    color: #1f2a1f;
+}
+
+.btn-secondary:hover {
+    background: #d9e6d9;
+}
+
+.button-column {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    align-items: center;
+}
+
+.btn-full {
+    text-align: center;
+    width: 100%;
+}
+
+.logout {
+    display: flex;
+    justify-content: center;
+}
+
+
+/* =========================
+   FLASH MESSAGES
+========================= */
+
+.flash {
+    padding: 10px;
+    border-radius: 6px;
+    margin: 10px 0;
+}
+
 .flash.success {
-    background-color: green;
+    background: #e7f6ea;
+    color: #1f6b2a;
 }
 
 .flash.danger {
-    background-color: red;
+    background: #fde8e8;
+    color: #8a1f1f;
 }
 
 .flash.warning {
-    background-color: orange;
+    background: #fff4e5;
+    color: #7a4b00;
 }
 
+
+/* =========================
+   BREADCRUMB
+========================= */
 
 .breadcrumb {
     padding: 10px 20px;
     font-size: 14px;
-    background: #f5f5f5;
+    background: #f1f3f1;
 }
 
 .breadcrumb a {
     text-decoration: none;
-    color: #007bff;
+    color: #2f8f2f;
+}
+
+.breadcrumb a:hover {
+    text-decoration: underline;
 }
 
 .breadcrumb span {
     color: #555;
 }
 
-.breadcrumb a:hover {
-    text-decoration: underline;
+
+/* =========================
+   TABLE SYSTEM
+========================= */
+
+.table-container {
+    width: 100%;
+    overflow-x: auto;
 }
+
+.custom-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.custom-table th {
+    text-align: left;
+    padding: 14px;
+    background: #f1f3f1;
+    color: #1f3b1f;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.custom-table td {
+    padding: 14px;
+    font-size: 14px;
+    border-bottom: 1px solid #e6e6e6;
+}
+
+.custom-table tr:nth-child(even) {
+    background: #fafafa;
+}
+
+.custom-table tr:hover {
+    background: #e7efe7;
+}
+
+
+/* =========================
+   MODAL
+========================= */
 
 .modal {
     display: none;
@@ -117,24 +403,21 @@ body {
     background: rgba(0,0,0,0.5);
 }
 
+.modal.active {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
 .modal-content {
-    background: white;
-    margin: 10% auto;
-    padding: 20px;
-    width: 60%;
-    border-radius: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    max-width: 500px;
 }
 
 .close {
-    float: right;
+    align-self: flex-end;
     cursor: pointer;
     font-size: 20px;
-}
-
-.btn-danger {
-    background-color: red;
-    color: white;
-    padding: 8px 12px;
-    border: none;
-    cursor: pointer;
 }

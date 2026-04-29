@@ -18,7 +18,7 @@
             {% if current_user.is_authenticated %}
                 <!-- Links only visible to logged-in users -->
                 <li><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
-                <li><a href="{{ url_for('main.logout') }}">Logout</a></li>
+{#                <li><a href="{{ url_for('main.logout') }}">Logout</a></li>#}
             {% else %}
                 <!-- Links for unauthenticated users -->
                 <li><a href="{{ url_for('main.login') }}">Login</a></li>

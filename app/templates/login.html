@@ -1,24 +1,34 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="card">
-    <h2>Login</h2>
 
-    <form method="POST" action="">
+<div class="form-header">
+    <h2>Login</h2>
+</div>
+
+<div class="form-wrapper" style="max-width: 500px;">
+    <form class="form-card" method="POST" action="">
         {{ form.hidden_tag() }}
 
-        <label>{{ form.email.label }}</label><br>
-        {{ form.email(size=32) }}<br><br>
+        <div class="field">
+            <label class="field-label">{{ form.email.label }}</label>
+            {{ form.email(class="field-input", size=32) }}
+        </div>
 
-        <label>{{ form.password.label }}</label><br>
-        {{ form.password(size=32) }}<br><br>
+        <div class="field">
+            <label class="field-label">{{ form.password.label }}</label>
+            {{ form.password(class="field-input", size=32) }}
+        </div>
 
-        <label>{{ form.remember.label }}</label><br>
-        {{ form.remember() }}<br><br>
+        <div class="field">
+            <label class="field-label">
+                {{ form.remember.label }}
+            </label>
+            {{ form.remember() }}
+        </div>
 
-        {{ form.submit }}
+        {{ form.submit(class="btn btn-primary") }}
     </form>
 </div>
+
 {% endblock %}
-
-

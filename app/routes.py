@@ -174,118 +174,148 @@ def join_group(group_id):
 
 @main.route('/generate_payouts/<int:group_id>', methods=['POST'])
 @login_required
-# this function is responsible for assigning and generating payout schedule
 def generate_payouts(group_id):
-    #fetch the group using the id from the url
-    #returns a 404 if group doesnt exist.
-    group = Group.query.get(group_id)
 
-    # sort the group members
-    members = sorted(group.members, key=lambda member: member.user_id)
+    print("\n========== GENERATE PAYOUTS START ==========")
+    print("[DEBUG] Group ID:", group_id)
 
-    # this prevents generating duplicates
+    # get the group or fail if it doesn't exist
+    group = Group.query.get_or_404(group_id)
+
+    # get members in stable order
+    from app.services.payout_services import generate_payout_order  # include payout_services
+
+    group = Group.query.get_or_404(group_id)
+
+    members = generate_payout_order(group)  # get properly ordered members
+    print("AFTER ORDER:", [m.user.full_name for m in members])
+    print("[DEBUG] Members found:", len(members))
+
+    # prevent duplicate payout schedules
     existing = PayoutSchedule.query.filter_by(group_id=group.id).all()
+
+    print("[DEBUG] Existing payouts:", len(existing))
+
     if existing:
+        print("[BLOCKED] Payouts already exist for this group")
         return jsonify({"error": "Payouts already generated!"}), 400
 
     payouts = []
 
-    # Each member will get exactly one turn in the rotation
+    # create payout schedule
     for i, recipient in enumerate(members):
+        # we calculate payout date based on position in the cycle
+        # cycle 0 = today, cycle 1 = +14 days
+        payout_date = datetime.utcnow().date() + timedelta(days=group.payout_frequency_days * i)
 
         payout = PayoutSchedule(
             group_id = group.id,
             recipient_id = recipient.user_id,
-            cycle_number = i + 1
+            cycle_number = i + 1,
+            payout_date = payout_date  # Every payout must have a date, otherwise sqlite will reject it
         )
 
         db.session.add(payout)
-        db.session.append(payout)
 
-    # flush to make sure id exist before using it
-    db.session.flush()
+        recipient.payout_position = i + 1
 
-    # for each payout, everyone contributes except the recipient
+        print(f"[CREATE] payout cycle={i + 1}, user={recipient.user_id}")
+        payouts.append(payout)
+
+        print(f"[CREATE] payout cycle={i+1}, user={recipient.user_id}")
+
+    db.session.flush()  # ensures payout.id exists
+
+    # create payment obligations
     for payout in payouts:
+
+        print(f"[PAYMENTS] building for payout {payout.id}")
+
         for member in members:
 
-            #this will skip the current recipient
+            # skip recipient (they don't pay themselves)
             if member.user_id == payout.recipient_id:
-                continue;
+                continue
 
             payment = Payment(
-                group_id = group.id,
-                payer_id = member.user_id,
-                payout_id = payout.id,
-                amount = group.contribution_amount
+                payer_id=member.user_id,  #  each payout belongs to a specific payout cycle
+                payout_id=payout.id,        # links payment to the payout cycle it contributes to
+                amount=group.contribution_amount       # how much each member contributes
             )
+            print(f"[PAYMENT CREATED] payer={member.user_id}, payout={payout.id}, amount={group.contribution_amount}")
 
             db.session.add(payment)
 
-    # commit everything togeter
+            print(f"[PAYMENT] payer={member.user_id} → payout={payout.id}")
+
+    print("\n[DEBUG] FINAL PAYOUT CHECK:")
+    for p in payouts:
+        print(f"  payout_id={p.id}, user={p.recipient_id}, date={p.payout_date}")
+
     db.session.commit()
 
+    print("======= GENERATE PAYOUTS END =======\n")
+
     return jsonify({
-        "message": "Payouts generated successfully!",
+        "success": True,
         "total_payouts": len(payouts),
         "total_members": len(members)
     }), 200
 
-    # # only group owner is allowed to generate payouts
-    # if group.owner_id != current_user.id:
-    #     flash("You are not authorized to generate payouts for this group.", "warning")
-    #
-    #     return jsonify({
-    #         "success": False,
-    #         "message": "Not authorized"
-    #     }), 403
-    #
-    #
-    # assign_payouts(group_id)   # assign payout order
-    #
-    # generate_payout_schedule(group_id)   # generate schedule
-    #
-    # # Get all payouts
-    # payouts = PayoutSchedule.query.filter_by(group_id=group_id).all()
-    #
-    #
-    # flash("Payout schedule generated!", "success")
-    #
-    # print("----PAYOUTS CREATED----")
-    # for p in payouts:
-    #     print(f"payout_id={p.id}, recipient={p.recipient_id}")
-    #
-    # print("--- CREATING PAYMENTS---")
-    #
-    # # create payment records
-    # for payout in payouts:
-    #     for member in group.members:
-    #
-    #         # skip if this member is the one receiving payout
-    #         if member.user_id == payout.recipient_id:
-    #             continue
-    #
-    #         existing = Payment.query.filter_by(
-    #             payer_id=member.user_id,
-    #             payout_id=payout.id
-    #         ).first()
-    #
-    #         if not existing:
-    #             print(f"Creating payments: payer={member.user_id}, payout={payout.id}")
-    #
-    #             payment = Payment(
-    #                 payer_id=member.user_id,
-    #                 payout_id=payout.id,
-    #                 amount=group.contribution_amount,
-    #                 is_on_time=True
-    #             )
-    #
-    #             db.session.add(payment)
-    # db.session.commit()
-    #
-    # return jsonify({"Success": True})
-    #
 
+@main.route('/reset_payouts/<int:group_id>', methods=['POST'])
+@login_required
+def reset_payouts(group_id):
+
+    print("\n========== RESET PAYOUTS ==========")
+    print("[RESET] Group ID:", group_id)
+
+    group = Group.query.get_or_404(group_id)
+
+    # only group owner can reset everything
+    if group.owner_id != current_user.id:
+        print("[BLOCKED] Not owner")
+        return jsonify({"error": "Not authorized"}), 403
+
+    # delete payments through payouts (
+    payout_ids = [p.id for p in PayoutSchedule.query.filter_by(group_id=group_id).all()]
+
+    print("[DEBUG] Payout IDs:", payout_ids)
+
+    deleted_payments = 0
+    if payout_ids:
+        deleted_payments = Payment.query.filter(Payment.payout_id.in_(payout_ids)).delete(synchronize_session=False)
+
+    print("[RESET] Payments deleted:", deleted_payments)
+
+    # delete payouts
+    deleted_payouts = PayoutSchedule.query.filter_by(group_id=group_id).delete()
+
+    print("[RESET] Payouts deleted:", deleted_payouts)
+
+    # reset member state
+    members = GroupMember.query.filter_by(group_id=group_id).all()
+    for m in members:
+        m.payout_position = None
+        m.has_received = False
+
+    db.session.commit()
+
+    print("[RESET COMPLETE]\n")
+
+    return jsonify({
+        "success": True,
+        "message": "Reset successful"
+    }), 200
+
+# fetch("/reset_payouts/1", {
+#     method: "POST"
+# })
+# .then(async res => {
+#     const data = await res.json();
+#     console.log("RESET RESPONSE:", data);
+# })
+# .catch(err => console.error("RESET ERROR:", err));
 
 @main.route("/mark_payout/<int:payout_id>/<int:user_id>", methods=['POST'])
 @login_required
@@ -334,6 +364,11 @@ def group_details(group_id):
     members = GroupMember.query.filter_by(group_id=group_id)\
         .order_by(GroupMember.payout_position.asc())\
         .all()
+
+    print("\n===== GROUP DETAILS DEBUG =====")
+    print("ORDER USED IN TEMPLATE:")
+    print([m.user.full_name for m in members])
+    print("================================\n")
 
     #get today's date
     today = datetime.utcnow().date()
