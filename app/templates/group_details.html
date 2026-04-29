@@ -1,6 +1,7 @@
-<h3>{{ group.name }}</h3>
+<h3 class="group-title">{{ group.name }}</h3>
 
-<table border="1" width="100%">
+<div class="table-container">
+<table class="custom-table">
     <tr>
         <th>Member</th>
         <th>Position</th>  {#order of payout#}
@@ -21,9 +22,9 @@
         {#  paid status flag #}
         <td>
             {% if member.has_received %}
-                ✅ Paid
+                <span class="status done">Paid</span>
             {% else %}
-                ⏳ Waiting
+                <span class="status waiting">Waiting</span>
             {% endif %}
         </td>
 
@@ -39,8 +40,8 @@
 
         <td>
             {% if payout and payout.proof_image %}
-                <button onclick="viewProof('{{ payout.proof_image }}')">
-                    View Proof
+                <button class="btn btn-secondary btn-small" onclick="viewProof('{{ payout.proof_image }}')">
+                    View
                 </button>
             {% else %}
                 -
@@ -50,12 +51,13 @@
     </tr>
     {% endfor %}
 </table>
+</div>
 
 <br>
 
 {# Only group owner can generate payout schedule#}
 {% if group.owner_id == current_user.id %}
-<button class="btn-primary" onclick="generatePayouts({{ group.id }})">
+<button class="btn btn-primary" onclick="generatePayouts({{ group.id }})">
     Generate Payout Schedule
 </button>
 {% endif %}
@@ -65,7 +67,7 @@
 {% if current_payout %}
 
     {% if current_user.id == current_payout.recipient_id %}
-        <button class="btn-secondary" onclick="alert('This does not apply to you')">
+        <button class="btn btn-secondary" onclick="alert('This does not apply to you')">
             Upload Proof
         </button>
     {% else %}
@@ -74,11 +76,11 @@
             | first %}
 
         {% if current_payout %}
-            <button class="btn-secondary" onclick="openUploadModal({{ current_payout.id }})">
+            <button class="btn btn-secondary" onclick="openUploadModal({{ current_payout.id }})">
                 Upload Proof
             </button>
         {% else %}
-            <button class="btn-secondary" onclick="alert('No payment record found yet')">
+            <button class="btn btn-secondary" onclick="alert('No payment record found yet')">
                 Upload Proof
             </button>
         {% endif %}
@@ -88,7 +90,7 @@
 
 {#Delete group#}
 {% if group.owner_id == current_user.id %}
-<button class="btn-danger" onclick="deleteGroup({{ group.id }})">
+<button class="btn btn-danger" onclick="deleteGroup({{ group.id }})">
     Delete Group
 </button>
 {% endif %}
@@ -109,15 +111,16 @@
 
         <input type="file" id="proofFile"/>  {# file input for selecting image #}
 
-        <button onclick="submitProofUpload()">
+        <button class="btn btn-primary" onclick="submitProofUpload()">
             Submit Proof
         </button>
 
         {# Debug #}
-        <div style="margin-top: 10px; fontSize: 12px; color:gray;">
+        <div style="margin-top: 10px; font-size: 12px; color:gray;">
             Upload Debug:
             <span id="uploadDebug">waiting..</span>
         </div>
     </div>
 </div>
+
 {# https://emojidb.org/website-emojis #}

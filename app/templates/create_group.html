@@ -1,34 +1,37 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h1>Create Group</h1>
+<div class="form-header">
+    <h1>Create Group</h1>
+</div>
 
-<div class="card p-3">
+<div class="form-wrapper">
     <!--Sends data via POST to backend route -->
-    <form method="POST">
+    <form method="POST" class="form-card">
 
         <!-- Group name input -->
-        <div class="form-group">
+        <div class="field">
             <label for="name">Group Name</label>
             <!-- Identifies the group in the system -->
-            <input type="text" name="name" class="form-control" required>
+            <input type="text" name="name" required>
         </div>
 
         <!-- Contribution amount input -->
-        <div class="form-group mt-2">
+        <div class="field">
             <label for="amount">Contribution Amount</label>
             <!-- Defines how much each member contributes per cycle -->
-            <input type="number" name="amount" class="form-control" required>
+            <input type="number" name="amount" required>
         </div>
 
-        <div class="form-group mt-2">
+        <div class="field">
             <label for="members">Number of Members</label>
              <!-- Used for planning group size (future expansion logic) -->
-            <input type="number" name="members" class="form-control" required>
+            <input type="number" name="members" required>
         </div>
 
         <!-- Submit button triggers group creation process -->
-       <button type="submit" class="btn btn-success mt-3">Create Group</button>
+       <button type="submit" class="btn btn-primary">Create Group</button>
     </form>
 </div>
+
 {% endblock %}

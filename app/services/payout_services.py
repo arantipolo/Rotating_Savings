@@ -6,7 +6,8 @@ def generate_payout_order(group):
     # Generates payout order ased on fairness and reliability.
     # This avoids always placing the same users early, and includes randomness to keep it fair
 
-    members = group.members
+    members = GroupMember.query.filter_by(group_id=group.id).all()
+    random.shuffle(members)
 
     scored_members = []   #scoring list
 
@@ -19,7 +20,7 @@ def generate_payout_order(group):
 
         randomness = random.uniform(0.8, 1.2) # keeps system from being too predictable
 
-        priority_score = reliability * fairness_penalty * randomness
+        priority_score = (reliability * fairness_penalty) * randomness
 
         scored_members.append((member, priority_score))
 
@@ -36,7 +37,6 @@ def generate_payout_order(group):
         member.payout_position = index + 1
         ordered_members.append(member)
 
-    # Save changes to database
     db.session.commit()
 
     return ordered_members

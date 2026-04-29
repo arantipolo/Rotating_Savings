@@ -9,14 +9,14 @@ window.openModal = function openModal(groupId) {    // opens modal and run group
         .then(response => response.text())   // convert response into plain text
         .then(data => {
             document.getElementById("modal-body").innerHTML = data;  // Put the returned HTML inside the modal body
-            document.getElementById("groupModal").style.display = "block";  // display the modal
+            document.getElementById("groupModal").classList.add("active");  // display the modal
         })
         .catch(err => console.error("Error loading modal:", err));  //log for debugging
 }
 
 // close modal
 window.closeModal = function closeModal(){
-    document.getElementById("groupModal").style.display = "none";
+    document.getElementById("groupModal").classList.remove("active");
 }
 
 // Sends a request to generate payouts for a group

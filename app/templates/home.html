@@ -2,23 +2,36 @@
 
 {% block content %}
 <div class="card">
-{% if current_user.is_authenticated %}
-    <h1>Welcome {{ current_user.full_name }} to Rotating Savings</h1>
-    <p>
-        Manage your savings group in one place.<br>
-        Track payout schedules, payment status, and proof uploads.
-    </p>
-    <button class="buttons" id="hover" onclick="hoverChangeColor()"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></button>
-    <button class="buttons"><a href="{{ url_for('main.logout') }}">Logout</a></button>
-{% else %}
-<h1>Welcome {{ current_user.full_name }}</h1>
-      <p>
-        Manage your savings group in one place.<br>
-        Track payout schedules, payment status, and proof uploads.
-    </p>
-<button class="buttons">
-    <a href="{{ url_for('main.login') }}">Login</a>
-</button>
-{% endif %}
+    {% if current_user.is_authenticated %}
+        <h1 class="group-header">Welcome {{ current_user.full_name }} to Rotating Savings</h1>
+        <p>
+            Manage your savings group in one place.<br>
+            Track payout schedules, payment status, and proof uploads.
+        </p>
+
+        <div class="button-column">
+            <a class="btn btn-primary btn-full" href="{{ url_for('main.dashboard') }}">
+                Dashboard
+            </a>
+
+            <a class="btn btn-secondary btn-full" href="{{ url_for('main.logout') }}">
+                Logout
+            </a>
+        </div>
+
+    {% else %}
+    <h1>Welcome {{ current_user.full_name }}</h1>
+          <p>
+            Manage your savings group in one place.<br>
+            Track payout schedules, payment status, and proof uploads.
+        </p>
+
+        <div class="button-column">
+            <a class="btn btn-primary btn-full" href="{{ url_for('main.login') }}">
+                Login
+            </a>
+        </div>
+
+    {% endif %}
 </div>
 {% endblock %}
