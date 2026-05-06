@@ -1,4 +1,20 @@
-<h3 class="group-title">{{ group.name }}</h3>
+<div class="group-header">
+    <h3 class="group-title">{{ group.name }}</h3>
+
+    {% if group.is_payout_locked %}
+        <span style="font-size: x-large;">🔒</span>
+    {% else %}
+        <span style="font-size: x-large;">🔓</span>
+    {% endif %}
+
+    {% if group.owner_id == current_user.id %}
+        <button class="btn btn-secondary" onclick="resetPayouts({{ group.id }})">
+            🔄
+        </button>
+    {% endif %}
+</div>
+
+
 
 <div class="table-container">
 <table class="custom-table">
@@ -29,20 +45,40 @@
         </td>
 
         <td>
-             {# match payout record for this user #}
             {% set payout = group.payouts
-                    | selectattr("recipient_id", "equalto", member.user_id)
-                    | sort(attribute="payout_date")
-                    | first %}
-            {# show date if it exists, otherwise leave blank #}
+                | selectattr("recipient_id", "equalto", member.user_id)
+                | first %}
+
+            {% if payout %}
+                {% set payment = payment_map.get((payout.id, current_user.id)) %}
+            {% else %}
+                {% set payment = None %}
+            {% endif %}
+
             {{ payout.payout_date if payout else "-" }}
         </td>
 
         <td>
-            {% if payout and payout.proof_image %}
-                <button class="btn btn-secondary btn-small" onclick="viewProof('{{ payout.proof_image }}')">
-                    View
-                </button>
+            {% set payout = group.payouts
+                | selectattr("recipient_id", "equalto", member.user_id)
+                | first %}
+
+            {% if payout %}
+                {% set payments = payment_map.values()
+                    | selectattr("payout_id", "equalto", payout.id)
+                    | list %}
+
+                {% set any_proof = payments
+                    | selectattr("proof_image")
+                    | first %}
+
+                {% if any_proof %}
+                    <button onclick="viewProof('{{ any_proof.proof_image }}')">
+                        View Proof
+                    </button>
+                {% else %}
+                    -
+                {% endif %}
             {% else %}
                 -
             {% endif %}
@@ -57,13 +93,21 @@
 
 {# Only group owner can generate payout schedule#}
 {% if group.owner_id == current_user.id %}
-<button class="btn btn-primary" onclick="generatePayouts({{ group.id }})">
-    Generate Payout Schedule
-</button>
+    <button class="btn btn-primary" onclick="generatePayouts({{ group.id }})">
+        Generate Payout
+    </button>
+
+    <button class="btn btn-secondary" onclick="lockPayouts({{ group.id }})">
+        {% if group.is_payout_locked %}
+            🔓 Unlock
+        {% else %}
+            🔒 Lock
+        {% endif %}
+    </button>
+
 {% endif %}
 
 {# upload proof#}
-{# upload proof button ALWAYS visible #}
 {% if current_payout %}
 
     {% if current_user.id == current_payout.recipient_id %}
@@ -71,17 +115,16 @@
             Upload Proof
         </button>
     {% else %}
-        {% set current_payment = current_payout.payments
-            | selectattr("payer_id", "equalto", current_user.id)
-            | first %}
+        {% set payment = payment_map.get((current_payout.id, current_user.id)) %}
 
-        {% if current_payout %}
-            <button class="btn btn-secondary" onclick="openUploadModal({{ current_payout.id }})">
+        {% if payment %}
+            <button class="btn btn-secondary"
+                onclick="openUploadModal({{ payment.id }})">
                 Upload Proof
             </button>
         {% else %}
-            <button class="btn btn-secondary" onclick="alert('No payment record found yet')">
-                Upload Proof
+            <button class="btn btn-secondary" disabled>
+               No Payment Found
             </button>
         {% endif %}
     {% endif %}

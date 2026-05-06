@@ -3,7 +3,7 @@ from app.models import GroupMember, Payment, PayoutSchedule
 from app import db
 
 def generate_payout_order(group):
-    # Generates payout order ased on fairness and reliability.
+    # Generates payout order based on fairness and reliability.
     # This avoids always placing the same users early, and includes randomness to keep it fair
 
     members = GroupMember.query.filter_by(group_id=group.id).all()
@@ -37,6 +37,6 @@ def generate_payout_order(group):
         member.payout_position = index + 1
         ordered_members.append(member)
 
-    db.session.commit()
+   # db.session.commit()
 
     return ordered_members

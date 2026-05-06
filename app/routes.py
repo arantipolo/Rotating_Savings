@@ -107,9 +107,11 @@ def generate_payout_schedule(group_id):
     db.session.commit()
 
 #helper function to validate uploaded file types for payment proof uploads
-def allowed_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in {"png", "jpg", "jpeg", "gif"}
+# def allowed_file(filename):
+#     return "." in filename and filename.rsplit(".", 1)[1].lower() in {"png", "jpg", "jpeg", "gif", "pdf"}
 
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in current_app.config["ALLOWED_EXTENSIONS"]
 def build_breadcrumbs(*items):
     return [{"label": label, "url": url} for label, url in items]
 
@@ -182,10 +184,18 @@ def generate_payouts(group_id):
     # get the group or fail if it doesn't exist
     group = Group.query.get_or_404(group_id)
 
+    print("[DEBUG] GROUP OBJECT:", group)
+    print("[DEBUG] GROUP ID TYPE:", type(group.id))
+    print("[DEBUG] GROUP ID VALUE:", group.id)
+
+    if group.is_payout_locked:
+        return jsonify({
+            "success": False,
+            "error": "Payout already locked!"
+        }), 403
+
     # get members in stable order
     from app.services.payout_services import generate_payout_order  # include payout_services
-
-    group = Group.query.get_or_404(group_id)
 
     members = generate_payout_order(group)  # get properly ordered members
     print("AFTER ORDER:", [m.user.full_name for m in members])
@@ -198,7 +208,9 @@ def generate_payouts(group_id):
 
     if existing:
         print("[BLOCKED] Payouts already exist for this group")
-        return jsonify({"error": "Payouts already generated!"}), 400
+        #return jsonify({"error": "Payouts already generated!"}), 400
+        PayoutSchedule.query.filter_by(group_id=group.id).delete()
+        db.session.commit()
 
     payouts = []
 
@@ -221,8 +233,6 @@ def generate_payouts(group_id):
 
         print(f"[CREATE] payout cycle={i + 1}, user={recipient.user_id}")
         payouts.append(payout)
-
-        print(f"[CREATE] payout cycle={i+1}, user={recipient.user_id}")
 
     db.session.flush()  # ensures payout.id exists
 
@@ -262,6 +272,26 @@ def generate_payouts(group_id):
         "total_members": len(members)
     }), 200
 
+
+@main.route('/toggle_lock/<int:group_id>', methods=['POST'])
+@login_required
+def toggle_lock(group_id):
+
+    group =Group.query.get_or_404(group_id)
+
+    if group.owner_id != current_user.id:
+        return jsonify({"Error": "Unauthorized!"}), 403
+    #toogle the lock
+    group.is_payout_locked = not group.is_payout_locked
+
+    db.session.commit()
+
+    print(f"[LOCK TOGGLED] Group {group.id} -> {group.is_payout_locked}")
+
+    return jsonify({
+        "group_id": group_id,
+        "is_payout_locked": group.is_payout_locked
+    }), 200
 
 @main.route('/reset_payouts/<int:group_id>', methods=['POST'])
 @login_required
@@ -308,14 +338,6 @@ def reset_payouts(group_id):
         "message": "Reset successful"
     }), 200
 
-# fetch("/reset_payouts/1", {
-#     method: "POST"
-# })
-# .then(async res => {
-#     const data = await res.json();
-#     console.log("RESET RESPONSE:", data);
-# })
-# .catch(err => console.error("RESET ERROR:", err));
 
 @main.route("/mark_payout/<int:payout_id>/<int:user_id>", methods=['POST'])
 @login_required
@@ -357,33 +379,54 @@ def mark_payout(payout_id, user_id):
 @main.route('/group_details/<int:group_id>')
 @login_required
 def group_details(group_id):
-
+    # Get group
     group = Group.query.get_or_404(group_id)
 
-    #sorted members by payout position
-    members = GroupMember.query.filter_by(group_id=group_id)\
-        .order_by(GroupMember.payout_position.asc())\
+    # Members ordered correctly
+    members = GroupMember.query.filter_by(group_id=group_id) \
+        .order_by(GroupMember.payout_position.asc()) \
         .all()
 
-    print("\n===== GROUP DETAILS DEBUG =====")
-    print("ORDER USED IN TEMPLATE:")
-    print([m.user.full_name for m in members])
-    print("================================\n")
+    # Payouts ordered
+    payouts = PayoutSchedule.query \
+        .filter_by(group_id=group_id) \
+        .order_by(PayoutSchedule.payout_date.asc()) \
+        .all()
 
-    #get today's date
+    #  map payout by recipient_id
+    payout_map = {p.recipient_id: p for p in payouts}
+
+   # print("Payout Map:", payout_map)
+
+    # map payments by (payout_id, payer_id)
+    payments = Payment.query.join(PayoutSchedule).filter(
+        PayoutSchedule.group_id == group_id
+    ).all()
+
+    payment_map = {
+        (p.payout_id, p.payer_id): p
+        for p in payments
+    }
+
+   # print("Payment Map:", payment_map)
+
+    # Find current payout (next upcoming or active)
     today = datetime.utcnow().date()
 
-    #find the current payout
-    current_payout = (
-        PayoutSchedule.query.filter(
-            PayoutSchedule.group_id == group_id,
-            PayoutSchedule.payout_date >= today
-        )
-        .order_by(PayoutSchedule.payout_date.asc())
-        .first()
-    )
-    return render_template('group_details.html', group=group, members=members, current_payout=current_payout)
+    current_payout = PayoutSchedule.query.filter(
+        PayoutSchedule.group_id == group_id,
+        PayoutSchedule.payout_date >= today
+    ).order_by(PayoutSchedule.payout_date.asc()).first()
 
+    return render_template(
+        "group_details.html",
+        group=group,
+        members=members,
+        payouts=payouts,
+        payout_map=payout_map,
+        payment_map=payment_map,
+        current_payout=current_payout
+    )
 
 # Creates a new savings group and adds creator as first member
 @main.route('/create_group', methods=['GET', 'POST'])
@@ -429,6 +472,7 @@ def create_group():
     return render_template(
         'create_group.html', breadcrumb=bredcrumbs)
 
+
 @main.route("/delete_group/<int:group_id>", methods=["POST"])
 @login_required
 def delete_group(group_id):
@@ -450,6 +494,8 @@ def delete_group(group_id):
     return jsonify({"Success": True})
 
 print("ROUTES LOADED")
+
+
 # Handles uploading proof of payment (image file) for a specific payment record
 @main.route("/upload_proof/<int:payment_id>", methods=["POST"])
 @login_required
@@ -461,13 +507,23 @@ def upload_proof(payment_id):
     # Find the payment record for this user and payout
     # This ensures users can only upload for their own payment
     payment = Payment.query.filter_by(
-        payout_id=payment_id,
+        id = payment_id,
         payer_id=current_user.id
     ).first()
+
+    print(f"[DEBUG] Trying to find payment: payment_id={payment_id}, payer_id={current_user.id}")
+    #payment = Payment.query.get(payment_id)
 
     if not payment:
         print("[UPLOAD] ERROR: Payment not found")
         return jsonify({"error": "Payment record not found"}), 404
+
+    print("[UPLOAD] current_user.id:", current_user.id)
+    print("[UPLOAD] payment.payer_id:", payment.payer_id)
+
+    if payment.payer_id != current_user.id:
+        return jsonify({"error": "Unauthorized"}), 403
+
 
     # get the file from request
     file = request.files.get("file")
@@ -482,19 +538,34 @@ def upload_proof(payment_id):
         print("[UPLOAD] ERROR: Empty filename")
         return jsonify({"error": "No selected file"}), 400
 
+    if not allowed_file(file.filename):
+        print("[UPLOAD] ERROR: Invalid file type")
+        return jsonify({"error": "Invalid file type. Only PNG, JPG, JPEG, and GIF are allowed."}), 400
+
     # secure file name to prevent weird chars or path attacks
     filename = secure_filename(file.filename)
 
     # build the path to upload folder
     upload_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
 
-    print("[UPLOAD] Saving file to:", upload_path)
-
-    # Save file to disk
-    file.save(upload_path)
+    try:
+        # Save file to disk
+        file.save(upload_path)
+    except Exception as e:
+        print(f"[UPLOAD] ERROR: {e}")
+        return jsonify({"error": "Failed to save the file."}), 500
 
     #Store filename in database
     payment.proof_image = filename
+
+    member = GroupMember.query.filter_by(
+        user_id = payment.payer_id,
+        group_id = payment.payout.group_id
+    ).first()
+
+    if member:
+        member.has_received = True
+
     db.session.commit()
 
     print("[UPLOAD] File saved + DB updated")
@@ -635,3 +706,6 @@ def logout():
     flash('You have been logged out.', 'success')
 
     return redirect(url_for('main.login'))
+
+
+# https://flask.palletsprojects.com/en/stable/quickstart/#routing

@@ -1,8 +1,10 @@
-let currentPaymentId = null;
-let currentGroupId = null;
+let currentPaymentId = null;   // stores which payment the user is uploading proof for
+let currentGroupId = null;  // stores which group is currently opened in the modal
+let isGeneratingPayout = false;   // this will ensure that payout generation will only work once.
+
 
 window.openModal = function openModal(groupId) {    // opens modal and run groups from server
-    currentGroupId = groupId;
+    currentGroupId = groupId;    // keep track of active group so we can refresh it later
     console.log("Opening modal:", groupId);
 
     fetch(`/group_details/${groupId}`)       //  request html content from this group from backend
@@ -11,101 +13,184 @@ window.openModal = function openModal(groupId) {    // opens modal and run group
             document.getElementById("modal-body").innerHTML = data;  // Put the returned HTML inside the modal body
             document.getElementById("groupModal").classList.add("active");  // display the modal
         })
-        .catch(err => console.error("Error loading modal:", err));  //log for debugging
+        .catch(err => console.error("Error lo ading modal:", err));  //log for debugging
 }
 
 // close modal
 window.closeModal = function closeModal(){
+    // hides the modal by removing active class
     document.getElementById("groupModal").classList.remove("active");
 }
 
+
 // Sends a request to generate payouts for a group
 function generatePayouts(groupId) {
+
+    if(isGeneratingPayout) {
+        console.log("Payout already in progress...");
+        return;
+    }
+
+    isGeneratingPayout = true;
+
+    const btn = document.querySelector(`button[onclick="generatePayouts(${groupId})"]`);
+    if(btn) {
+        btn.disabled = true;
+        btn.innerText = "Generating...";
+    }
+
     fetch(`/generate_payouts/${groupId}`, {
         method: "POST"    // POST because we're creating or updating something on the server
     })
-        .then(res => res.json())      // expect JSON back from the server
+        .then(res => {
+            if(!res.ok) {   // check if backend returned an error status
+                return res.json().then(err => {
+                    throw new Error(err.error) || "Request failed"
+                });
+            }
+            return  res.json();
+        })     // expect JSON back from the server
         .then(data => {
+                //backend sends success flag, if false show error
+            if(!data.success){
+                alert(data.error || "Failed to generate payouts");
+                return;
+            }
+            console.error("Payout schedule generated");
             alert("Payout schedule generated!");
 
+            isGeneratingPayout = true;
             openModal(groupId);  // reload modal so the new data shows up
         })
-        .catch(err => console.error(err));
+        .catch(err => {
+            console.error("Generate payout error", err);
+            alert("Failed: " + err.message);
+        })
+        .finally(() => {
+            isGeneratingPayout = false;
+
+            if(btn) {
+                btn.disabled = false;
+                btn.innerText = "Generate Payout";
+            }
+        });
 }
 
-// opens upload modal and stores which payout is being uploaded for
-window.openUploadModal = function(paymentId, recipientId) {
-    console.log("Opening upload modal:", paymentId, recipientId);
+//Reset all payouts and payment records for a group
+async function resetPayouts(groupId){
 
-    const currentUserId = window.currentUserId;
+    console.log("[RESET] Requesting reset for group: ", groupId);
 
-    //block recipient because recipient should only recieve payment and do not need to upload
-    if(Number(currentUserId) === Number(recipientId)){
-        alert("This action doesn't apply to you");
-        return;
-    }
-    currentPaymentId = paymentId; // keep track of which payout this upload belongs to
-    document.getElementById("uploadModal").style.display = "block";
-}
-
-//close the upload modal
-window.closeUploadModal = function() {
-    document.getElementById("uploadModal").style.display = "none";
-    currentPaymentId = null;
-}
-
-// submits proof file to backend for the selected payout
-window.submitProofUpload = function() {
-
-    console.log("[UPLOAD] submit button clicked!");
-
-    const fileInput = document.getElementById("proofFile");
-    const file = fileInput.files[0];
-
-    console.log("[UPLOAD] Selected file:", file);
-    // ensure file is seleced
-    if (!file) {
-        console.warn("[UPLOAD] No file selected");
-        alert("Please select a file first");
+    // confirm with user before resetting payout
+    if(!confirm("This will delete aLL payouts and payment records. Continue?")) {
+        console.log("[RESET] Cancelled by user");
         return;
     }
 
-    const formData = new FormData();
-    formData.append("file", file);
-
-    // send file to backend
-    fetch(`/upload_proof/${currentPaymentId}`, {
-        method: "POST",
-        body: formData
+    // send reset request to backend
+    fetch(`/reset_payouts/${groupId}`, {
+        method: "POST"
     })
         .then(res => {
-            console.log("[UPLOAD] Server response status:", res.status);
-            //ensure that request is successful
+            console.log("[RESET] Server response status:",res.status);
+
+            // check if reset failed on server side, this will ensure request was successful
             if(!res.ok) {
-                return res.text().then(text => {
-                    console.error("[UPLOAD] Error response:", text);
-                    throw new Error("Upload falied:" + res.status);
+                return res.json().then(err => {
+                    console.log("[RESET] Error response:", err);
+                    throw new Error(err.error || "Reset failed");
                 });
             }
             return res.json();
         })
         .then(data => {
-            console.log("[UPLOAD] Success response:", data);
+            console.log("[RESET] Success response:", data);
 
-            if(data.success) {
-                alert("Payment Proof uploaded successfully!");
+            if (data.success) {
+                alert("Payouts reset successfully");
 
-                //refresh modal so updated proof appears
-                openModal(currentGroupId);
-                closeUploadModal();
+                isGeneratingPayout= false;
+                openModal(groupId);       //reload modal
             } else {
-                alert(data.error || "Upload falied!");
+                alert(data.error || "Reset failed!");
+                 openModal(groupId);
             }
         })
         .catch(err => {
-            console.error("Upload error:", err);
+            console.error("Failed:" + err.message);
+            alert("Failed: " + err.message);
         });
+
 }
+
+// this function allows the group owner to toggle payout lock or unlock state
+function lockPayouts(groupId) {
+    fetch(`/toggle_lock/${groupId}`, {
+        method: "POST"
+    })
+        .then(res => res.json())
+        .then(data => {
+            console.log("LOCK RESPONSE:",data);
+
+            // backend returns boolean flag indicating lock state
+            if (data.is_payout_locked){
+                alert("Payouts Locked");
+            } else {
+                alert("Payouts UNLOCKED");
+            }
+
+            openModal(groupId)
+        })
+        .catch(err => console.error(err));
+}
+
+window.openUploadModal = function (paymentId) {
+    console.log("Opening modal:", paymentId);
+
+    window.currentPaymentId = paymentId;  // store globally
+
+    document.getElementById("uploadModal").style.display = "block";
+};
+
+// close upload modal
+window.closeUploadModal = function () {
+    console.log("[UPLOAD] Closing modal");
+
+    document.getElementById("uploadModal").style.display = "none";
+    currentPaymentId = null;
+}
+
+//submits proof file to backend for the selected payout
+window.submitProofUpload = function () {
+    const fileInput = document.getElementById("proofFile");
+
+    if (!fileInput.files.length) {
+        alert("Please select a file");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+
+    fetch(`/upload_proof/${window.currentPaymentId}`, {
+        method: "POST",
+        body: formData
+    })
+    //.then(r => r.json())
+        .then(async (r) => {
+            const data = await r.json();
+
+            if(!r.ok) {
+                alert("Failed: " + (data.error || "Upload failed"));
+                return;
+            }
+            console.log(data);
+            alert("Uploaded!");
+            closeUploadModal();
+        })
+    .catch(err => console.error(err));
+};
+
 
 // Opens a modal to view uploaded proof image
 window.viewProof = function(filename){
@@ -127,12 +212,11 @@ function deleteGroup(groupId) {
         .then(res => res.json())
         .then(data => {
             if(data.success) {
-                closeModal();
+                closeModal();   // close modal after successful  deletion
                 alert("Group deleted");
 
-
-
-                location.reload();  // refresh dashboard
+                openModal(groupId)
+              //  location.reload();  // refresh dashboard
             }
         })
         .catch(err => console.error("Delete error:", err));
