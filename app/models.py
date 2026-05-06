@@ -3,6 +3,7 @@ from app import db
 from datetime import datetime
 from flask_login import UserMixin
 
+
 # This model connects Users and Groups (many-to-many relationship)
 # Each record represents:
 # a user belonging to a group
@@ -68,6 +69,7 @@ class Group(db.Model):
     owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     members = db.relationship('GroupMember', back_populates='group', cascade="all, delete-orphan")      # All members in this group via GroupMember table
     payouts = db.relationship('PayoutSchedule', backref='group', lazy=True, cascade="all, delete-orphan")     # Payout schedule entries for this group
+    is_payout_locked = db.Column(db.Boolean, default=False)
 
     def __repr__(self):
         return f"<Group {self.name}>"
