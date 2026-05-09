@@ -8,7 +8,7 @@
 {% if groups %}
     <!-- Loop through all groups retrieved from database -->
     {% for group in groups %}
-        <div class="card group-card">
+        <div class="card group-card" style="max-width: 600px;">
                 <!-- Group identification -->
             <h3 class="group-header">{{ group.name }}</h3>
 <!-- Financial requirement per member -->

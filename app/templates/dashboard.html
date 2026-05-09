@@ -14,7 +14,7 @@
     <!--Provides shortcuts for main system features:
      - Create a new group
      - Join existing groups -->
-<div class="dashboard-actions card">
+<div class="dashboard-actions card" >
     <h2>Quick Actions</h2>
         <div class="button-column">
     <a href="{{ url_for('main.create_group') }}" class="btn btn-primary btn-full">
@@ -101,7 +101,9 @@
 </div>
 <!-- ends user session, returns to login page -->
 <div class="logout card">
-    <a href="{{ url_for('main.logout') }}" class="buttons">Logout</a>
+
+    <a href="{{ url_for('main.logout') }}" class="btn btn-secondary">Logout</a>
+
 </div>
 {% endblock %}
 

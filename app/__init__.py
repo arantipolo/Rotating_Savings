@@ -2,12 +2,14 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from config import Config
+from flask_migrate import Migrate
 
 # Initialize extensions (no imports from models yet!)
 db = SQLAlchemy()
 login = LoginManager()
 login.login_view = 'main.login'  # blueprint name.login route
 
+migrate = Migrate()
 
 def create_app():
     app = Flask(__name__)
@@ -28,5 +30,7 @@ def create_app():
     # Import models AFTER db is initialized
 
     from app import models
+
+    migrate.init_app(app, db)
 
     return app
