@@ -34,4 +34,6 @@ jobs:
         run: python -m compileall config.py run.py app tests
 
       - name: Run tests
-        run: pytest
+        run: python -m pytest
+        env:
+          PYTHONPATH: ${{ github.workspace }}
