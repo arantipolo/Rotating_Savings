@@ -42,4 +42,13 @@ def create_app():
             db.create_all()
         click.echo("Initialized the database.")
 
+    @app.after_request
+    def add_no_cache_headers(response):
+        # Stops protected pages from being reused from the browser cache after logout
+        # This helps make sure old dashboard data is not visible once the session ends
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
+
     return app

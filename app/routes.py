@@ -730,14 +730,13 @@ def logout():
     logout_user()
     session.clear()
 
-    # force cookie reset
-    # response = redirect(url_for('main.login'))
-    # response.delete_cookie('session')
-     #return response
-    # response.set_cookie('session', '', expires=0)
     flash('You have been logged out.', 'success')
 
-    return redirect(url_for('main.login'))
+    # Deletes the browser session cookie so logout takes effect immediately
+    response = redirect(url_for('main.login'))
+    response.delete_cookie(current_app.config.get("SESSION_COOKIE_NAME", "session"))
+
+    return response
 
 
 # https://flask.palletsprojects.com/en/stable/quickstart/#routing

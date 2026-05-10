@@ -59,6 +59,19 @@ def test_user_can_register_and_login(client):
     assert b"Welcome John Tester" in login_response.data
 
 
+def test_dashboard_is_blocked_after_logout(client):
+    # Makes sure a logged-out user cannot keep using the dashboard
+    # even if they were logged in earlier during the same browser session
+    register(client)
+    login(client)
+    logout(client)
+
+    response = client.get("/dashboard")
+
+    assert response.status_code == 302
+    assert "/login" in response.headers["Location"]
+
+
 def test_duplicate_email_registration_is_handled(client):
     # Makes sure duplicate emails show a friendly message
     # instead of crashing the app with a database error
