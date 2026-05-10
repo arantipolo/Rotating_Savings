@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: rotating-savings
+    runtime: python
+    plan: free
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    preDeployCommand: flask --app wsgi init-db
+    startCommand: gunicorn wsgi:app
+    autoDeployTrigger: checksPass
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.13
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rotating-savings-db
+          property: connectionString
+
+databases:
+  - name: rotating-savings-db
+    databaseName: rotating_savings
+    user: rotating_savings
