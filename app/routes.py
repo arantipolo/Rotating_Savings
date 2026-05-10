@@ -730,11 +730,11 @@ def logout():
     logout_user()
     session.clear()
 
-    flash('You have been logged out.', 'success')
-
-    # Deletes the browser session cookie so logout takes effect immediately
-    response = redirect(url_for('main.login'))
+    # Sends the user home after logout and clears login cookies
+    # This also removes remember-me login so the user cannot be silently signed back in
+    response = redirect(url_for('main.home'))
     response.delete_cookie(current_app.config.get("SESSION_COOKIE_NAME", "session"))
+    response.delete_cookie(current_app.config.get("REMEMBER_COOKIE_NAME", "remember_token"))
 
     return response
 

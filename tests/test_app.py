@@ -17,12 +17,13 @@ def register(client, email="john@example.com", password="password123"):
     )
 
 
-def login(client, email="john@example.com", password="password123"):
+def login(client, email="john@example.com", password="password123", remember=False):
     return client.post(
         "/login",
         data={
             "email": email,
             "password": password,
+            "remember": "y" if remember else "",
         },
         follow_redirects=True,
     )
@@ -64,6 +65,19 @@ def test_dashboard_is_blocked_after_logout(client):
     # even if they were logged in earlier during the same browser session
     register(client)
     login(client)
+    logout(client)
+
+    response = client.get("/dashboard")
+
+    assert response.status_code == 302
+    assert "/login" in response.headers["Location"]
+
+
+def test_remembered_login_is_cleared_after_logout(client):
+    # Makes sure remember-me login cannot silently sign the user back in
+    # after they click logout
+    register(client)
+    login(client, remember=True)
     logout(client)
 
     response = client.get("/dashboard")
