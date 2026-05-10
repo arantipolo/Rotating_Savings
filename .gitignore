@@ -1,2 +1,9 @@
 sshKey
 sshKey.pub
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.DS_Store
+app.db
+.env
