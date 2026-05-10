@@ -7,17 +7,38 @@ from app.models import User, Group, GroupMember, PayoutSchedule, Payment
 from app import db
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
-import random, os
+import random, os, uuid
 
 
 main = Blueprint('main', __name__)
 
 @main.route('/debug-session')
+@login_required
 def debug_session():
     return {
         "authenticated": current_user.is_authenticated,
         "user_id": current_user.get_id()
     }
+
+def current_user_membership(group_id):
+    # Finds the membership record for the logged-in user
+    # This stops users from viewing or changing groups they do not belong to
+    return GroupMember.query.filter_by(
+        user_id=current_user.id,
+        group_id=group_id
+    ).first()
+
+def require_group_member(group_id):
+    # Blocks access when a user tries to open a group by guessing its URL id
+    membership = current_user_membership(group_id)
+    if not membership:
+        abort(403)
+    return membership
+
+def require_group_owner(group):
+    # Only the group creator should control payouts, locks, and destructive actions
+    if group.owner_id != current_user.id:
+        abort(403)
 
 # Assign payout positions using a weighted random approach.
 #instead of assigning pure randomness, this method look at how reliable each user based on past behaviour (ontime or late payment)
@@ -150,11 +171,12 @@ def groups():
 @main.route('/join_group/<int:group_id>', methods=['POST'])
 @login_required
 def join_group(group_id):
+    group = Group.query.get_or_404(group_id)
 
     # check if user is already part of the group
     existing = GroupMember.query.filter_by(
         user_id=current_user.id,
-        group_id=group_id
+        group_id=group.id
     ).first()
 
     if existing:
@@ -164,7 +186,7 @@ def join_group(group_id):
     # add user to group
     membership = GroupMember(
         user_id=current_user.id,
-        group_id=group_id
+        group_id=group.id
     )
 
     db.session.add(membership)
@@ -183,6 +205,7 @@ def generate_payouts(group_id):
 
     # get the group or fail if it doesn't exist
     group = Group.query.get_or_404(group_id)
+    require_group_owner(group)
 
     print("[DEBUG] GROUP OBJECT:", group)
     print("[DEBUG] GROUP ID TYPE:", type(group.id))
@@ -381,6 +404,7 @@ def mark_payout(payout_id, user_id):
 def group_details(group_id):
     # Get group
     group = Group.query.get_or_404(group_id)
+    require_group_member(group.id)
 
     # Members ordered correctly
     members = GroupMember.query.filter_by(group_id=group_id) \
@@ -524,6 +548,7 @@ def upload_proof(payment_id):
     if payment.payer_id != current_user.id:
         return jsonify({"error": "Unauthorized"}), 403
 
+    require_group_member(payment.payout.group_id)
 
     # get the file from request
     file = request.files.get("file")
@@ -540,12 +565,15 @@ def upload_proof(payment_id):
 
     if not allowed_file(file.filename):
         print("[UPLOAD] ERROR: Invalid file type")
-        return jsonify({"error": "Invalid file type. Only PNG, JPG, JPEG, and GIF are allowed."}), 400
+        return jsonify({"error": "Invalid file type. Only PNG, JPG, JPEG, GIF, and PDF are allowed."}), 400
 
     # secure file name to prevent weird chars or path attacks
+    # unique prefix keeps two users from overwriting files with the same name
     filename = secure_filename(file.filename)
+    filename = f"{payment.id}-{uuid.uuid4().hex}-{filename}"
 
     # build the path to upload folder
+    os.makedirs(current_app.config["UPLOAD_FOLDER"], exist_ok=True)
     upload_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
 
     try:
@@ -583,6 +611,7 @@ def submit_payment(payout_id):
     # This creates a Payment record and evaluates whether the payment
     #  was made on time, which will later affect the user's reliability score.
     payout = PayoutSchedule.query.get_or_404(payout_id)
+    require_group_member(payout.group_id)
 
     # This prevents paying yourself
     if payout.recipient_id == current_user.id:
@@ -637,14 +666,17 @@ def register():
     form = RegistrationForm()
 
     if form.validate_on_submit():
+        existing_user = User.query.filter_by(email=form.email.data).first()
+        if existing_user:
+            flash("An account with this email already exists. Please log in.", "warning")
+            return redirect(url_for('main.login'))
+
         user = User(
             full_name=form.full_name.data,
             email=form.email.data,
         )
         user.set_password(form.password.data)
 
-        pwd = user.check_password(form.password.data)
-        confirmPassword = form.confirm_password.data
         db.session.add(user)
         db.session.commit()
 

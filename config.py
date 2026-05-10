@@ -18,4 +18,11 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False  # turns off unnecesary overhead tracking
     UPLOAD_FOLDER = os.path.join(basedir, "app", "uploads")  # Uploaded files will be save here
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf'}
+    MAX_CONTENT_LENGTH = 5 * 1024 * 1024  # limits upload size so proof files cannot overwhelm the app
+    SESSION_COOKIE_HTTPONLY = True  # keeps browser JavaScript from reading the session cookie
+    SESSION_COOKIE_SAMESITE = "Lax"  # helps protect session cookies during cross-site requests
+    SESSION_COOKIE_SECURE = os.environ.get(
+        'SESSION_COOKIE_SECURE',
+        'true' if database_url else 'false',
+    ).lower() == 'true'  # requires HTTPS cookies in deployed environments
 
