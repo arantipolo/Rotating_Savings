@@ -4,8 +4,11 @@ services:
     runtime: python
     plan: free
     branch: main
+    # Installs the Python packages needed before Render starts the app
     buildCommand: pip install -r requirements.txt
+    # Creates any missing database tables before the new deployment goes live
     preDeployCommand: flask --app wsgi init-db
+    # Starts the Flask app in production with gunicorn
     startCommand: gunicorn wsgi:app
     autoDeployTrigger: checksPass
     healthCheckPath: /

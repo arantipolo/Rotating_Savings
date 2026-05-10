@@ -34,6 +34,8 @@ def create_app():
 
     migrate.init_app(app, db)
 
+    # Initializes database tables for the deployed app
+    # Render runs this before deployment so registration and groups have tables to write to
     @app.cli.command("init-db")
     def init_db_command():
         with app.app_context():
