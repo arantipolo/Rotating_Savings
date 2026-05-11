@@ -21,6 +21,10 @@ services:
         fromDatabase:
           name: rotating-savings-db
           property: connectionString
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
 
 databases:
   - name: rotating-savings-db

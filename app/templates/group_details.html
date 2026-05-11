@@ -1,171 +1,226 @@
 <div class="group-header">
     <h3 class="group-title">{{ group.name }}</h3>
 
-    {% if group.is_payout_locked %}
-        <span style="font-size: x-large;">🔒</span>
-    {% else %}
-        <span style="font-size: x-large;">🔓</span>
-    {% endif %}
+    <div class="button-row">
+        {% if group.is_payout_locked %}
+            <span class="meta-item">Locked</span>
+        {% else %}
+            <span class="meta-item">Open</span>
+        {% endif %}
 
-    {% if group.owner_id == current_user.id %}
-        <button class="btn btn-secondary" alternate="Reset Group" onclick="resetPayouts({{ group.id }})">
-            🔄
-        </button>
-    {% endif %}
+        {% if group.owner_id == current_user.id %}
+            <button class="btn btn-secondary" title="Reset Group" onclick="resetPayouts({{ group.id }})">
+                Reset
+            </button>
+        {% endif %}
+    </div>
 </div>
 
+<div id="modalStatus" class="action-message" hidden></div>
 
+<div class="helper-note">
+    <strong>Payment proof</strong> is a receipt or screenshot showing that a member paid their contribution for the current payout cycle.
+    The person receiving the payout does not upload proof for that cycle.
+</div>
 
 <div class="table-container">
-<table class="custom-table">
-    <tr>
-        <th>Member</th>
-        <th>Position</th>  {#order of payout#}
-        <th>Status</th>
-        <th>Payout Date</th>
-        <th>Proof</th>
-    </tr>
+    <table class="custom-table">
+        <tr>
+            <th>Member</th>
+            <th>Position</th>  {# order of payout #}
+            <th>Status</th>
+            <th>Payout Date</th>
+            <th>Proof</th>
+        </tr>
 
-    {% for member in members %}
-    <tr>
-        <td>{{ member.user.full_name }}</td>
+        {% for member in members %}
+        <tr {% if member.user_id == current_user.id %}data-current-user-row="true"{% endif %}>
+            <td>{{ member.user.full_name }}</td>
 
-        {#payout position#}
-        <td>
-            {{  member.payout_position if member.payout_position else "Not assigned" }}
-        </td>
+            {# payout position #}
+            <td data-member-position="{{ member.user_id }}">
+                {{ member.payout_position if member.payout_position else "Not assigned" }}
+            </td>
 
-        {#  paid status flag #}
-        <td>
-            {% if member.has_received %}
-                <span class="status done">Paid</span>
-            {% else %}
-                <span class="status waiting">Waiting</span>
-            {% endif %}
-        </td>
+            {# paid status flag #}
+            <td>
+                {% if current_payout %}
+                    {% if member.user_id == current_payout.recipient_id %}
+                        <span class="status waiting">Receiving payout</span>
+                    {% else %}
+                        {% set current_payment = payment_map.get((current_payout.id, member.user_id)) %}
+                        {% if current_payment and current_payment.proof_image %}
+                            <span class="status done">Proof uploaded</span>
+                        {% else %}
+                            <span class="status waiting">Waiting</span>
+                        {% endif %}
+                    {% endif %}
+                {% elif member.has_received %}
+                    <span class="status done">Received payout</span>
+                {% else %}
+                    <span class="status waiting">Waiting</span>
+                {% endif %}
+            </td>
 
-        <td>
-            {% set payout = group.payouts
-                | selectattr("recipient_id", "equalto", member.user_id)
-                | first %}
+            <td>
+                {% set payout = group.payouts
+                    | selectattr("recipient_id", "equalto", member.user_id)
+                    | first %}
 
-            {% if payout %}
-                {% set payment = payment_map.get((payout.id, current_user.id)) %}
-            {% else %}
-                {% set payment = None %}
-            {% endif %}
+                {% if payout %}
+                    {% set payment = payment_map.get((payout.id, current_user.id)) %}
+                {% else %}
+                    {% set payment = None %}
+                {% endif %}
 
-            {{ payout.payout_date if payout else "-" }}
-        </td>
+                {{ payout.payout_date if payout else "-" }}
+            </td>
 
-        <td>
-            {#
-               search for the payment they made for the current active payout cycle.
-            #}
-
-            {% set payout = current_payout %}
-
-            {% if payout %}
-                {% set payment = payment_map.get((payout.id, member.user_id)) %}
-
+            <td>
                 {#
-                    payment_map key = (payout_id, payer_id)
-                   match if this member pay this payout
+                   Search for the payment they made for the current active payout cycle.
                 #}
 
-                {% if payment and payment.proof_image %}
-                    <button onclick="viewProof('{{ payment.proof_image }}')">
-                        View Proof
-                    </button>
+                {% set payout = current_payout %}
+
+                {% if payout %}
+                    {% set payment = payment_map.get((payout.id, member.user_id)) %}
+
+                    {#
+                       payment_map key = (payout_id, payer_id)
+                       match if this member paid this payout
+                    #}
+
+                    {% if payment and payment.proof_image %}
+                        <button class="btn btn-secondary" onclick="viewProof('{{ payment.proof_image }}')">
+                            View Proof
+                        </button>
+                    {% else %}
+                        -
+                    {% endif %}
                 {% else %}
                     -
                 {% endif %}
-            {% else %}
-                -
-            {% endif %}
-        </td>
-
-
-    </tr>
-    {% endfor %}
-</table>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
 </div>
 
-<br>
+{# Only group owner can generate payout schedule #}
+{% set is_owner = group.owner_id == current_user.id %}
+<div class="button-row group-action-row" style="margin-top: 16px;">
+    {% if is_owner %}
+        <button class="btn btn-primary" onclick="generatePayouts({{ group.id }})">
+            Generate Payout
+        </button>
 
-{# Only group owner can generate payout schedule#}
-{% if group.owner_id == current_user.id %}
-    <button class="btn btn-primary" onclick="generatePayouts({{ group.id }})">
-        Generate Payout
-    </button>
-
-    <button class="btn btn-secondary" onclick="lockPayouts({{ group.id }})">
-        {% if group.is_payout_locked %}
-            🔓 Unlock
-        {% else %}
-            🔒 Lock
-        {% endif %}
-    </button>
-
-{% endif %}
-
-{# upload proof#}
-{% if current_payout %}
-
-    {% if current_user.id == current_payout.recipient_id %}
-        <button class="btn btn-secondary" onclick="alert('This does not apply to you')">
-            Upload Proof
+        <button class="btn btn-secondary" onclick="lockPayouts({{ group.id }})">
+            {% if group.is_payout_locked %}
+                Unlock
+            {% else %}
+                Lock
+            {% endif %}
         </button>
     {% else %}
-        {% set payment = payment_map.get((current_payout.id, current_user.id)) %}
+        <button class="btn btn-secondary" disabled>
+            Owner Generates Payout
+        </button>
 
-        {% if payment %}
-            <button class="btn btn-secondary"
-                onclick="openUploadModal({{ payment.id }})">
-                Upload Proof
-            </button>
-        {% else %}
-            <button class="btn btn-secondary" disabled>
-               No Payment Found
-            </button>
-        {% endif %}
+        <button class="btn btn-secondary" disabled>
+            Owner Locks Payout
+        </button>
     {% endif %}
 
+    {# upload proof #}
+    {% if current_payout %}
+
+        {% if not group.is_payout_locked %}
+            <button class="btn btn-secondary" disabled>
+                {% if is_owner %}
+                    Lock Schedule First
+                {% else %}
+                    Waiting for Lock
+                {% endif %}
+            </button>
+        {% elif current_user.id == current_payout.recipient_id %}
+            <button class="btn btn-secondary" onclick="showProofRecipientMessage()">
+                No Proof Needed
+            </button>
+        {% else %}
+            {% set payment = payment_map.get((current_payout.id, current_user.id)) %}
+
+            {% if payment %}
+                <button class="btn btn-secondary" onclick="openUploadModal({{ payment.id }})">
+                    Upload Proof
+                </button>
+            {% else %}
+                <button class="btn btn-secondary" disabled>
+                    No Payment Found
+                </button>
+            {% endif %}
+        {% endif %}
+
+    {% endif %}
+
+    {% if not current_payout %}
+        <button class="btn btn-secondary" disabled>
+            Proof Opens After Schedule
+        </button>
+    {% endif %}
+
+    {# Delete group #}
+    {% if is_owner %}
+        <button class="btn btn-danger" onclick="deleteGroup({{ group.id }})">
+            Delete Group
+        </button>
+    {% else %}
+        <button class="btn btn-danger" disabled>
+            Owner Deletes Group
+        </button>
+    {% endif %}
+</div>
+
+{% if not is_owner or not current_payout %}
+    <div class="helper-note">
+        {% if not is_owner %}
+            Only the group owner can generate payout order, lock payouts, reset, or delete this group.
+        {% endif %}
+        {% if not current_payout %}
+            Payment proof becomes available after the payout schedule is generated.
+        {% endif %}
+    </div>
 {% endif %}
 
-{#Delete group#}
-{% if group.owner_id == current_user.id %}
-<button class="btn btn-danger" onclick="deleteGroup({{ group.id }})">
-    Delete Group
-</button>
+{% if current_payout and not group.is_payout_locked %}
+    <div class="helper-note">
+        Payment proof opens after the payout schedule is locked. Locking confirms the order before members start submitting receipts.
+    </div>
 {% endif %}
+
+<div id="uploadPanel" class="upload-panel" hidden>
+    <div>
+        <p class="eyebrow">Payment Proof</p>
+        <h3>Upload receipt</h3>
+        <p class="muted">
+            Choose a screenshot, receipt image, or PDF showing that you paid this cycle's contribution.
+        </p>
+    </div>
+
+    <input class="file-input" type="file" id="proofFile" accept=".png,.jpg,.jpeg,.gif,.pdf">
+
+    <div class="button-row">
+        <button class="btn btn-primary" type="button" onclick="submitProofUpload()">
+            Submit Proof
+        </button>
+        <button class="btn btn-secondary" type="button" onclick="closeUploadModal()">
+            Cancel
+        </button>
+    </div>
+
+    <div id="uploadStatus" class="action-message loading" hidden></div>
+</div>
 
 <script>
     window.currentUserId = {{ current_user.id }};
 </script>
-
-{#This modal pops up when the user clicks "upload proof" allowing the user to select a file and send it to backend#}
-
-<div id="uploadModal" class="modal" style="display:none;">
-    <div class="modal-content">
-        <span class="close" onclick="closeUploadModal()">
-            &times;
-        </span>
-
-        <h2>Upload Proof</h2>
-
-        <input type="file" id="proofFile"/>  {# file input for selecting image #}
-
-        <button class="btn btn-primary" onclick="submitProofUpload()">
-            Submit Proof
-        </button>
-
-        {# Debug #}
-        <div style="margin-top: 10px; font-size: 12px; color:gray;">
-            Upload Debug:
-            <span id="uploadDebug">waiting..</span>
-        </div>
-    </div>
-</div>
-
-{# https://emojidb.org/website-emojis #}

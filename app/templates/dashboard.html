@@ -2,109 +2,161 @@
 
 {% block content %}
 
-    <!-- Displays logged-in user info and system purpose -->
-<div class="card">
-    <h1>Welcome {{ current_user.full_name }}</h1>
-    <p>
-        Manage your savings group in one place.<br>
-        Track payout schedules, payment status, and proof uploads.
-    </p>
-</div>
-
-    <!--Provides shortcuts for main system features:
-     - Create a new group
-     - Join existing groups -->
-<div class="dashboard-actions card" >
-    <h2>Quick Actions</h2>
-        <div class="button-column">
-    <a href="{{ url_for('main.create_group') }}" class="btn btn-primary btn-full">
-        Create Group
-    </a>
-
-    <a href="{{ url_for('main.groups') }}" class="btn btn-secondary btn-full">
-        Join Group
-    </a>
-</div>
-</div>
-
-    <!-- Displays all groups the user is currently a member of -->
-<div class="user-groups card">
-    <h2>Your Groups</h2>
-
-    {% if memberships %}
-         <!-- Loop through all groups the user belongs to -->
-        {% for membership in memberships %}
-
-            <div id="group-{{ membership.group.id }}" class="group-card">
-
-                    <!-- Header row -->
-                    <div class="group-header">
-                        <h3 class="group-title">Group {{ membership.group.name }}</h3>
-
-                        <button class="btn btn-secondary" onclick="openModal({{ membership.group.id }})">
-                            View
-                        </button>
-                    </div>
-
-                    <!-- Info section -->
-                    <div class="group-meta">
-
-                        <div class="meta-item">
-                            💰 {{ membership.group.contribution_amount }}
-                        </div>
-
-                        <div class="meta-item">
-                            📅 {{ membership.group.created_at.strftime('%Y-%m-%d') }}
-                        </div>
-
-                        <div class="meta-item">
-                            👥 {{ membership.group.members|length }} members
-                        </div>
-
-                        <div class="meta-item">
-                            📍 Position: {{ membership.payout_position if membership.payout_position else "N/A" }}
-                        </div>
-
-                    </div>
-
-                    <!-- Status -->
-                    <div class="status {% if membership.has_received %}done{% else %}waiting{% endif %}">
-                        {% if membership.has_received %}
-                            ✔ Received payout
-                        {% else %}
-                            ⏳ Waiting for payout
-                        {% endif %}
-                    </div>
-
-            </div>
-
-
-            <hr>
-        {% endfor %}
-
-        <div id="groupModal" class="modal">
-            <div class="modal-content">
-                <span class="close" onclick="closeModal()">&times;</span>
-
-                <h2>Group Details</h2>
-
-                <div id="modal-body">
-                    <!-- content loads here -->
-                </div>
-
+<div class="dashboard-page">
+    <aside class="dashboard-sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-mark small">RS</div>
+            <div>
+                <p class="eyebrow">Workspace</p>
+                <h2>{{ current_user.full_name }}</h2>
             </div>
         </div>
-    {% else %}
-        <!-- Message shown when user has no group memberships -->
-        <p>You are not in any groups yet.</p>
-    {% endif %}
-</div>
-<!-- ends user session, returns to login page -->
-<div class="logout card">
 
-    <a href="{{ url_for('main.logout') }}" class="btn btn-secondary">Logout</a>
+        <nav class="sidebar-nav" aria-label="Dashboard actions">
+            <a class="sidebar-link active" href="{{ url_for('main.dashboard') }}">Dashboard</a>
+            <a class="sidebar-link" href="{{ url_for('main.create_group') }}">Create Group</a>
+            <a class="sidebar-link" href="{{ url_for('main.groups') }}">Join Group</a>
+        </nav>
 
+        <div class="sidebar-note">
+            <p class="eyebrow">Focus</p>
+            <p>Track payout order, contribution status, and payment proof from one working screen.</p>
+        </div>
+
+        <a href="{{ url_for('main.logout') }}" class="btn btn-secondary btn-full">Logout</a>
+    </aside>
+
+    <main class="dashboard-main">
+        <section class="dashboard-topline">
+            <div>
+                <p class="eyebrow">Rotating Savings</p>
+                <h1>Welcome {{ current_user.full_name }}</h1>
+                <p class="muted">Manage your savings groups, payout cycles, and proof uploads without jumping between screens.</p>
+            </div>
+
+            <div class="topline-actions">
+                <a href="{{ url_for('main.create_group') }}" class="btn btn-primary">Create Group</a>
+                <a href="{{ url_for('main.groups') }}" class="btn btn-secondary">Join Group</a>
+            </div>
+        </section>
+
+        <section class="dashboard-stats" aria-label="Account summary">
+            <div class="stat-tile">
+                <span>Groups</span>
+                <strong>{{ memberships|length }}</strong>
+            </div>
+
+            <div class="stat-tile">
+                <span>Awaiting payout</span>
+                <strong>
+                    {{ memberships
+                        | selectattr("has_received", "equalto", false)
+                        | list
+                        | length }}
+                </strong>
+            </div>
+
+            <div class="stat-tile">
+                <span>Completed</span>
+                <strong>
+                    {{ memberships
+                        | selectattr("has_received", "equalto", true)
+                        | list
+                        | length }}
+                </strong>
+            </div>
+        </section>
+
+        <section class="dashboard-section">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Groups</p>
+                    <h2>Your savings circles</h2>
+                </div>
+            </div>
+
+            {% if memberships %}
+                <div class="group-list">
+                    {% for membership in memberships %}
+                        <article id="group-{{ membership.group.id }}" class="group-card">
+                            <div class="group-card-top">
+                                <div>
+                                    <h3 class="group-title">{{ membership.group.name }}</h3>
+                                    <p class="muted">Created {{ membership.group.created_at.strftime('%Y-%m-%d') }}</p>
+                                </div>
+
+                                <button class="btn btn-secondary" onclick="openModal({{ membership.group.id }})">
+                                    View
+                                </button>
+                            </div>
+
+                            <div class="group-metrics">
+                                <div>
+                                    <span>Contribution</span>
+                                    <strong>${{ membership.group.contribution_amount }}</strong>
+                                </div>
+
+                                <div>
+                                    <span>Members</span>
+                                    <strong>{{ membership.group.members|length }}</strong>
+                                </div>
+
+                                <div>
+                                    <span>Position</span>
+                                    <strong data-dashboard-position="{{ membership.group.id }}">
+                                        {{ membership.payout_position if membership.payout_position else "Not assigned" }}
+                                    </strong>
+                                </div>
+                            </div>
+
+                            <div class="group-card-footer">
+                                <span class="status-pill {% if membership.has_received %}done{% else %}waiting{% endif %}">
+                                    {% if membership.has_received %}
+                                        Received payout
+                                    {% else %}
+                                        Waiting for payout
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </article>
+                    {% endfor %}
+                </div>
+
+                <div id="groupModal" class="modal">
+                    <div class="modal-content">
+                        <span class="close" onclick="closeModal()">&times;</span>
+
+                        <h2>Group Details</h2>
+
+                        <div id="modal-body">
+                            <!-- content loads here -->
+                        </div>
+                    </div>
+                </div>
+
+                <div id="confirmDialog" class="modal confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-hidden="true">
+                    <div class="modal-content confirm-dialog">
+                        <div class="confirm-icon">!</div>
+                        <h2 id="confirmTitle">Confirm action</h2>
+                        <p id="confirmMessage">Are you sure?</p>
+
+                        <div class="confirm-actions">
+                            <button id="confirmCancel" class="btn btn-secondary" type="button">
+                                Cancel
+                            </button>
+                            <button id="confirmAccept" class="btn btn-danger" type="button">
+                                Confirm
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    You are not in any groups yet.
+                </div>
+            {% endif %}
+        </section>
+    </main>
 </div>
+
 {% endblock %}
-
-

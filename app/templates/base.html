@@ -2,60 +2,67 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rotating Savings</title>
 
-        <!-- Link to global stylesheet for consistent UI styling -->
+    <!-- Link to global stylesheet for consistent UI styling -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-        <!-- Displays different links depending on login state -->
+    <!-- Displays different links depending on login state -->
     <nav class="navbar">
         <div class="nav-container">
             <h1 class="logo">Rotating Savings</h1>
-          <ul class="nav-links">
-            <li><a href="{{ url_for('main.home') }}">Home</a></li>  <!-- Always available home link -->
 
-            {% if current_user.is_authenticated %}
-                <!-- Links only visible to logged-in users -->
-                <li><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
-{#                <li><a href="{{ url_for('main.logout') }}">Logout</a></li>#}
-            {% else %}
-                <!-- Links for unauthenticated users -->
-                <li><a href="{{ url_for('main.login') }}">Login</a></li>
-                <li><a href="{{ url_for('main.register') }}">Register</a></li>
-            {% endif %}
-        </ul>
+            <ul class="nav-links">
+                <li><a href="{{ url_for('main.home') }}">Home</a></li>  <!-- Always available home link -->
+
+                {% if current_user.is_authenticated %}
+                    <!-- Links only visible to logged-in users -->
+                    <li><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+                    <li><a href="{{ url_for('main.groups') }}">Groups</a></li>
+                {% else %}
+                    <!-- Links for unauthenticated users -->
+                    <li><a href="{{ url_for('main.login') }}">Login</a></li>
+                    <li><a href="{{ url_for('main.register') }}">Register</a></li>
+                {% endif %}
+            </ul>
         </div>
     </nav>
- <!-- Breadcrumb Navigation - shows user location in app-->
+
+    <!-- Breadcrumb Navigation - shows user location in app -->
     <div class="breadcrumb">
-        {% if breadcrumb %}
-            {% for item in breadcrumb %}
-                {% if not loop.last %}
-                    <a href="{{ item.url }}">{{ item.label }}</a> &gt;
-                {% else %}
-                    <span>{{ item.label }}</span>
-                {% endif %}
+        <div class="breadcrumb-inner">
+            {% if breadcrumb %}
+                {% for item in breadcrumb %}
+                    {% if not loop.last %}
+                        <a href="{{ item.url }}">{{ item.label }}</a> &gt;
+                    {% else %}
+                        <span>{{ item.label }}</span>
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Flash message system, displays success/error messages from backend actions -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash {{ category }}">
+                    {{ message }}
+                </div>
             {% endfor %}
         {% endif %}
-    </div>
- <!--flash message system, displays success/error messages from backend actions-->
-            {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            {% for category, message in messages %}
-              <div class="flash {{ category }}">
-                {{ message }}
-              </div>
-            {% endfor %}
-          {% endif %}
-        {% endwith %}
+    {% endwith %}
 
-        <!--Main content area, child templates inject their content here-->
+    <!-- Main content area, child templates inject their content here -->
     <div class="container">
         {% block content %}
 
         {% endblock %}
     </div>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 </body>
 </html>

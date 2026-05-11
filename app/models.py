@@ -64,6 +64,7 @@ class Group(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     contribution_amount = db.Column(db.Float, nullable=False)      # Amount each member contributes per cycle
+    max_members = db.Column(db.Integer, nullable=False, default=15)  # Planned maximum group size
     payout_frequency_days = db.Column(db.Integer, default=14) # defines payout cycle frequency
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)

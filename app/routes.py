@@ -4,13 +4,23 @@ from wtforms.validators import equal_to
 
 from app.forms import RegistrationForm, LoginForm
 from app.models import User, Group, GroupMember, PayoutSchedule, Payment
-from app import db
+from app import db, oauth
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 import random, os, uuid
 
 
 main = Blueprint('main', __name__)
+MAX_GROUP_MEMBERS = 15
+
+def google_oauth_ready():
+    # Google login depends on credentials that must be set outside the codebase
+    # This keeps local development and tests from failing when OAuth is not configured
+    return (
+        current_app.config.get("GOOGLE_CLIENT_ID")
+        and current_app.config.get("GOOGLE_CLIENT_SECRET")
+        and hasattr(oauth, "google")
+    )
 
 @main.route('/debug-session')
 @login_required
@@ -160,12 +170,59 @@ def dashboard():
 @login_required
 def groups():
     all_groups = Group.query.all()
+    joined_group_ids = {membership.group_id for membership in current_user.groups}
+    today = datetime.utcnow().date()
+
+    capacity_by_group = {}
+    is_full_by_group = {}
+    paid_counts = {}
+    payment_targets = {}
+
+    for group in all_groups:
+        # Older groups default to 15 because the max member count was added later
+        # Existing overfilled groups remain visible but cannot accept new members
+        max_members = min(group.max_members or MAX_GROUP_MEMBERS, MAX_GROUP_MEMBERS)
+        current_member_count = len(group.members)
+        current_payout = PayoutSchedule.query.filter(
+            PayoutSchedule.group_id == group.id,
+            PayoutSchedule.payout_date >= today
+        ).order_by(PayoutSchedule.payout_date.asc()).first()
+
+        capacity_by_group[group.id] = max_members
+        is_full_by_group[group.id] = current_member_count >= max_members
+
+        # Proofs count members who submitted payment proof for the active payout cycle
+        payment_targets[group.id] = max(current_member_count - 1, 0) if current_payout else 0
+        paid_counts[group.id] = (
+            Payment.query.filter(
+                Payment.payout_id == current_payout.id,
+                Payment.proof_image.isnot(None)
+            ).count()
+            if current_payout
+            else 0
+        )
+
+    ready_count = sum(
+        1 for group in all_groups
+        if group.id not in joined_group_ids
+        and not is_full_by_group.get(group.id, False)
+    )
     breadcrumbs = [
         {"label": "Home", "url": url_for('main.home')},
         {"label": "Dashboard", "url": url_for('main.dashboard')},
         {"label": "Groups", "url": None}
     ]
-    return render_template('groups.html', groups=all_groups, breadcrumb=breadcrumbs)
+    return render_template(
+        'groups.html',
+        groups=all_groups,
+        joined_group_ids=joined_group_ids,
+        ready_count=ready_count,
+        capacity_by_group=capacity_by_group,
+        is_full_by_group=is_full_by_group,
+        paid_counts=paid_counts,
+        payment_targets=payment_targets,
+        breadcrumb=breadcrumbs
+    )
 
 # Handles joining a group (prevents duplicate memberships)
 @main.route('/join_group/<int:group_id>', methods=['POST'])
@@ -182,6 +239,12 @@ def join_group(group_id):
     if existing:
         flash("You already joined this group", "warning")
         return redirect(url_for('main.dashboard'))
+
+    # Prevents groups from accepting more members than the creator planned for
+    max_members = min(group.max_members or MAX_GROUP_MEMBERS, MAX_GROUP_MEMBERS)
+    if len(group.members) >= max_members:
+        flash("That group is already full", "warning")
+        return redirect(url_for('main.groups'))
 
     # add user to group
     membership = GroupMember(
@@ -278,8 +341,6 @@ def generate_payouts(group_id):
             print(f"[PAYMENT CREATED] payer={member.user_id}, payout={payout.id}, amount={group.contribution_amount}")
 
             db.session.add(payment)
-
-            print(f"[PAYMENT] payer={member.user_id} → payout={payout.id}")
 
     print("\n[DEBUG] FINAL PAYOUT CHECK:")
     for p in payouts:
@@ -461,13 +522,29 @@ def create_group():
         amount = request.form.get('amount')
         members = request.form.get('members')
 
-        if not name or not amount:
+        if not name or not amount or not members:
             flash("Missing required fields", "danger")
+            return redirect(url_for('main.create_group'))
+
+        try:
+            contribution_amount = float(amount)
+            max_members = int(members)
+        except ValueError:
+            flash("Contribution amount and member count must be numbers", "danger")
+            return redirect(url_for('main.create_group'))
+
+        if contribution_amount <= 0 or max_members < 1:
+            flash("Contribution amount and member count must be positive", "danger")
+            return redirect(url_for('main.create_group'))
+
+        if max_members > MAX_GROUP_MEMBERS:
+            flash("Groups cannot have more than 15 members", "danger")
             return redirect(url_for('main.create_group'))
 
         group = Group(
             name = name,
-            contribution_amount=float(amount),
+            contribution_amount=contribution_amount,
+            max_members=max_members,
             owner_id = current_user.id
         )
 
@@ -500,22 +577,28 @@ def create_group():
 @main.route("/delete_group/<int:group_id>", methods=["POST"])
 @login_required
 def delete_group(group_id):
-    print("DELETE HIT") # debug
     group = Group.query.get_or_404(group_id)
 
     #security check
     if group.owner_id != current_user.id:
         abort(403)
 
-    # force detach relationships first
-    GroupMember.query.filter_by(group_id=group.id).delete()
-    PayoutSchedule.query.filter_by(group_id=group_id).delete()
+    # Delete payment records before removing payouts and memberships
+    # This keeps group deletion from leaving proof/payment rows behind
+    payout_ids = [
+        payout.id for payout in PayoutSchedule.query.filter_by(group_id=group_id).all()
+    ]
 
+    if payout_ids:
+        Payment.query.filter(Payment.payout_id.in_(payout_ids)).delete(synchronize_session=False)
+
+    # SQLAlchemy removes group members and payout schedules through Group relationships
+    # after payment rows are cleared out of the way
     db.session.delete(group)
     db.session.commit()
     db.session.expire_all()
 
-    return jsonify({"Success": True})
+    return jsonify({"success": True})
 
 print("ROUTES LOADED")
 
@@ -583,16 +666,9 @@ def upload_proof(payment_id):
         print(f"[UPLOAD] ERROR: {e}")
         return jsonify({"error": "Failed to save the file."}), 500
 
-    #Store filename in database
+    # Store filename in database
+    # Proof upload confirms a contribution payment; it does not mean the payer received a payout.
     payment.proof_image = filename
-
-    member = GroupMember.query.filter_by(
-        user_id = payment.payer_id,
-        group_id = payment.payout.group_id
-    ).first()
-
-    if member:
-        member.has_received = True
 
     db.session.commit()
 
@@ -724,6 +800,61 @@ def login():
         {"label": "Login", "url": None}
     ]
     return render_template('login.html', form=form, breadcrumb=breadcrumb)
+
+
+@main.route('/login/google')
+def google_login():
+    if current_user.is_authenticated:
+        return redirect(url_for('main.dashboard'))
+
+    if not google_oauth_ready():
+        flash("Google sign-in is not configured yet. Use email and password for now.", "warning")
+        return redirect(url_for('main.login'))
+
+    redirect_uri = url_for('main.google_callback', _external=True)
+    return oauth.google.authorize_redirect(redirect_uri)
+
+
+@main.route('/login/google/callback')
+def google_callback():
+    if not google_oauth_ready():
+        flash("Google sign-in is not configured yet. Use email and password for now.", "warning")
+        return redirect(url_for('main.login'))
+
+    try:
+        token = oauth.google.authorize_access_token()
+        user_info = token.get("userinfo")
+
+        if not user_info:
+            user_info = oauth.google.userinfo()
+    except Exception:
+        flash("Google sign-in failed. Please try again or use email and password.", "danger")
+        return redirect(url_for('main.login'))
+
+    email = user_info.get("email")
+    email_verified = user_info.get("email_verified", True)
+
+    if not email or not email_verified:
+        flash("Google did not return a verified email address.", "danger")
+        return redirect(url_for('main.login'))
+
+    email = email.lower()
+    user = User.query.filter_by(email=email).first()
+
+    if not user:
+        # Google-created accounts use a random password so password login is not silently enabled
+        # Users can still sign in through Google with this verified email
+        user = User(
+            full_name=user_info.get("name") or email.split("@")[0],
+            email=email,
+        )
+        user.set_password(uuid.uuid4().hex)
+        db.session.add(user)
+        db.session.commit()
+
+    login_user(user)
+    flash("You have been logged in with Google.", "success")
+    return redirect(url_for('main.dashboard'))
 
 
 # logout and clears session and forces cookie reset

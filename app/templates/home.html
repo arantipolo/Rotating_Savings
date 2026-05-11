@@ -2,81 +2,64 @@
 
 {% block content %}
 
-<div class="card">
+<div class="card home-card">
 
     <!-- HERO -->
     <div class="hero-section">
+        <div class="hero-copy">
+            <h1>Rotating savings, organized without the chaos.</h1>
 
-        <h1 class="group-header">
-            Rotating Savings Made Simple
-        </h1>
+            <p class="subtitle">
+                Manage group contributions, payout order, and payment proof in one shared place built for trust and transparency.
+            </p>
 
-        <p class="subtitle">
-            A trusted way for groups to save together and receive payouts in rotation
-            without spreadsheets, confusion, or manual tracking.
-        </p>
+            <!-- CTA: Primary actions for user onboarding -->
+            <div class="button-row" style="margin-top: 22px;">
+                {% if current_user.is_authenticated %}
+                    <a class="btn btn-primary" href="{{ url_for('main.dashboard') }}">
+                        Go to Dashboard
+                    </a>
 
-        <p class="subtitle" style="margin-top: 10px;">
-            Every contribution, payout, and member action is tracked transparently to ensure fairness in every cycle.
-        </p>
+                    <a class="btn btn-secondary" href="{{ url_for('main.groups') }}">
+                        Browse Groups
+                    </a>
+                {% else %}
+                    <a class="btn btn-primary" href="{{ url_for('main.register') }}">
+                        Get Started
+                    </a>
 
-        <!-- QUICK VALUE POINTS -->
-        <div class="stats-row">
-
-            <div class="stat-box">
-                <h3>🤝 Group-Based</h3>
-                <p>Save with trusted members</p>
+                    <a class="btn btn-secondary" href="{{ url_for('main.login') }}">
+                        Login
+                    </a>
+                {% endif %}
             </div>
-
-            <div class="stat-box">
-                <h3>📅 Automated</h3>
-                <p>No manual payout tracking</p>
-            </div>
-
-            <div class="stat-box">
-                <h3>📈 Fair System</h3>
-                <p>Transparent rotation logic</p>
-            </div>
-
         </div>
 
-        <!-- CTA: Primary actions for user onboarding -->
-        <p class="subtitle" style="margin-top: 10px;">
-            Join or create a group in under a minute.
-        </p>
-
-        <div class="button-column">
-
-            {% if current_user.is_authenticated %}
-
-                <a class="btn btn-primary btn-full" href="{{ url_for('main.dashboard') }}">
-                    Go to Dashboard
-                </a>
-
-                <a class="btn btn-secondary btn-full" href="{{ url_for('main.groups') }}">
-                    Browse Groups
-                </a>
-
-                <a class="btn btn-secondary btn-full" href="{{ url_for('main.logout') }}">
-                    Logout
-                </a>
-
-            {% else %}
-
-                <a class="btn btn-primary btn-full" href="{{ url_for('main.register') }}">
-                    Get Started
-                </a>
-
-                <a class="btn btn-secondary btn-full" href="{{ url_for('main.login') }}">
-                    Login
-                </a>
-
-            {% endif %}
-
+        <div class="hero-panel">
+            <h2>Track the full cycle</h2>
+            <p>
+                Members, payout positions, payment status, and uploaded proof stay connected to the group record.
+            </p>
         </div>
-
     </div>
 
+    <!-- QUICK VALUE POINTS -->
+    <div class="stats-row">
+        <div class="stat-box">
+            <h3>Group based</h3>
+            <p>Built around trusted savings circles.</p>
+        </div>
+
+        <div class="stat-box">
+            <h3>Payment proof</h3>
+            <p>Upload records for contribution tracking.</p>
+        </div>
+
+        <div class="stat-box">
+            <h3>Fair rotation</h3>
+            <p>Payout order stays visible to members.</p>
+        </div>
+    </div>
 
     <!-- HOW IT WORKS -->
     <div class="how-it-works">

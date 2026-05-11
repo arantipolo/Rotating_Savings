@@ -1,6 +1,8 @@
 import os
+from dotenv import load_dotenv
 
 basedir = os.path.abspath(os.path.dirname(__file__))
+load_dotenv(os.path.join(basedir, '.env'))
 
 # Uses Render's database URL when the app is deployed
 # Falls back to the local SQLite database while developing on our machine
@@ -19,6 +21,8 @@ class Config:
     UPLOAD_FOLDER = os.path.join(basedir, "app", "uploads")  # Uploaded files will be save here
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf'}
     MAX_CONTENT_LENGTH = 5 * 1024 * 1024  # limits upload size so proof files cannot overwhelm the app
+    GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')  # Google OAuth public client id
+    GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')  # Google OAuth private client secret
     SESSION_COOKIE_HTTPONLY = True  # keeps browser JavaScript from reading the session cookie
     SESSION_COOKIE_SAMESITE = "Lax"  # helps protect session cookies during cross-site requests
     SESSION_COOKIE_SECURE = os.environ.get(

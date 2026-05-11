@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from app import db
-from app.models import Group, PayoutSchedule, User
+from app.models import Group, GroupMember, PayoutSchedule, User
 
 
 def register(client, email="john@example.com", password="password123"):
@@ -97,6 +97,15 @@ def test_duplicate_email_registration_is_handled(client):
     assert b"already exists" in response.data
 
 
+def test_google_login_without_credentials_falls_back_to_password_login(client):
+    # Google OAuth needs client credentials from the deployment environment
+    # so local/test runs should show a friendly fallback instead of crashing
+    response = client.get("/login/google", follow_redirects=True)
+
+    assert response.status_code == 200
+    assert b"Google sign-in is not configured yet" in response.data
+
+
 def test_logged_in_user_can_create_group(client):
     register(client)
     login(client)
@@ -112,8 +121,85 @@ def test_logged_in_user_can_create_group(client):
     )
 
     assert response.status_code == 200
-    assert Group.query.filter_by(name="Capstone Savings").first() is not None
+    group = Group.query.filter_by(name="Capstone Savings").first()
+
+    assert group is not None
+    assert group.max_members == 4
     assert b"Capstone Savings" in response.data
+
+
+def test_full_group_cannot_accept_more_members(client):
+    # Creates a one-person group and makes sure another user cannot join
+    # after the group has reached its planned member limit
+    register(client)
+    login(client)
+    client.post(
+        "/create_group",
+        data={
+            "name": "One Seat Group",
+            "amount": "50",
+            "members": "1",
+        },
+        follow_redirects=True,
+    )
+    group = Group.query.filter_by(name="One Seat Group").first()
+    logout(client)
+
+    register(client, email="late@example.com")
+    login(client, email="late@example.com")
+    response = client.post(f"/join_group/{group.id}", follow_redirects=True)
+
+    assert response.status_code == 200
+    assert b"already full" in response.data
+    assert GroupMember.query.filter_by(
+        user_id=User.query.filter_by(email="late@example.com").first().id,
+        group_id=group.id,
+    ).first() is None
+
+
+def test_group_cannot_be_created_above_member_limit(client):
+    # Keeps oversized groups from being created
+    # because the app currently supports a maximum of 15 members per group
+    register(client)
+    login(client)
+
+    response = client.post(
+        "/create_group",
+        data={
+            "name": "Too Large Group",
+            "amount": "100",
+            "members": "16",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"cannot have more than 15 members" in response.data
+    assert Group.query.filter_by(name="Too Large Group").first() is None
+
+
+def test_group_owner_can_delete_their_group(client):
+    # Owners should be able to remove a group they created
+    # and the JSON response should match what the dashboard JavaScript expects
+    register(client)
+    login(client)
+
+    client.post(
+        "/create_group",
+        data={
+            "name": "Temporary Group",
+            "amount": "125",
+            "members": "3",
+        },
+        follow_redirects=True,
+    )
+
+    group = Group.query.filter_by(name="Temporary Group").first()
+    response = client.post(f"/delete_group/{group.id}")
+
+    assert response.status_code == 200
+    assert response.get_json() == {"success": True}
+    assert Group.query.filter_by(name="Temporary Group").first() is None
 
 
 def test_user_cannot_view_group_they_do_not_belong_to(client):
