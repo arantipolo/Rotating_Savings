@@ -2,33 +2,58 @@
 
 {% block content %}
 
-<div class="form-header">
-    <h2>Login</h2>
-</div>
-
-<div class="form-wrapper" style="max-width: 600px;">
-    <form class="form-card" method="POST" action="">
-        {{ form.hidden_tag() }}
-
-        <div class="field">
-            <label class="field-label">{{ form.email.label }}</label>
-            {{ form.email(class="field-input", size=32) }}
+<div class="auth-shell">
+    <div class="auth-card">
+        <div class="auth-brand">
+            <div class="brand-mark">RS</div>
+            <h1>Welcome back</h1>
+            <p>Log in to manage your savings groups, payout schedules, and payment proof.</p>
         </div>
 
-        <div class="field">
-            <label class="field-label">{{ form.password.label }}</label>
-            {{ form.password(class="field-input", size=32) }}
+        <form class="form" method="POST" action="">
+            {{ form.hidden_tag() }}
+
+            <div class="field">
+                <label class="field-label">{{ form.email.label }}</label>
+                {{ form.email(class="field-input", size=32, placeholder="Email address") }}
+            </div>
+
+            <div class="field">
+                <label class="field-label">{{ form.password.label }}</label>
+                {{ form.password(class="field-input", size=32, placeholder="Password") }}
+            </div>
+
+            <div class="field field-inline">
+                {{ form.remember() }}
+                <label class="field-label">
+                    {{ form.remember.label }}
+                </label>
+            </div>
+
+            {{ form.submit(class="btn btn-primary btn-full") }}
+        </form>
+
+        <div class="auth-switch">
+            Don't have an account?
+            <a href="{{ url_for('main.register') }}">Sign up</a>
         </div>
 
-        <div class="field">
-            <label class="field-label">
-                {{ form.remember.label }}
-            </label>
-            {{ form.remember() }}
+        <div class="auth-divider">
+            <span></span>
+            <p>OR</p>
+            <span></span>
         </div>
 
-        {{ form.submit(class="btn btn-primary") }}
-    </form>
+        <a class="social-btn" href="{{ url_for('main.google_login') }}">
+            <svg class="google-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.26h6.47c-.28 1.44-1.13 2.66-2.4 3.48v2.89h3.89c2.27-2.1 3.53-5.19 3.53-8.36z"/>
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.94-2.92l-3.89-2.89c-1.08.72-2.46 1.15-4.05 1.15-3.12 0-5.76-2.11-6.71-4.95H1.27v3.05C3.25 21.34 7.29 24 12 24z"/>
+                <path fill="#FBBC05" d="M5.29 14.39c-.24-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.76H1.27C.46 8.38 0 10.15 0 12.1s.46 3.72 1.27 5.34l4.02-3.05z"/>
+                <path fill="#EA4335" d="M12 4.86c1.76 0 3.34.61 4.59 1.8l3.44-3.44C17.95 1.27 15.24 0 12 0 7.29 0 3.25 2.66 1.27 6.76l4.02 3.05C6.24 6.97 8.88 4.86 12 4.86z"/>
+            </svg>
+            Continue with Google
+        </a>
+    </div>
 </div>
 
 {% endblock %}

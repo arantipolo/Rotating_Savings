@@ -1,33 +1,125 @@
 {% extends "base.html" %}
 
 {% block content %}
-<!-- Displays all available savings groups in the system
-    users can browse and join groups -->
-<h2>Available Groups</h2>
 
-{% if groups %}
-    <!-- Loop through all groups retrieved from database -->
-    {% for group in groups %}
-        <div class="card group-card" style="max-width: 600px;">
-                <!-- Group identification -->
-            <h3 class="group-header">{{ group.name }}</h3>
-<!-- Financial requirement per member -->
-            <p>💰 Contribution: {{ group.contribution_amount }}</p>
-           <!-- Current number of participants in group -->
-            <p>👥 Members: {{ group.members|length }}</p>
-
-            <!-- Sends POST request to backend to create membership
-                 This triggers GroupMember creation in database-->
-            <form method="POST" action="{{ url_for('main.join_group', group_id=group.id) }}">
-                <button class="btn btn-primary">
-                    Join Group
-                </button>
-            </form>
-
+<div class="available-page">
+    <!-- Displays all available savings groups in the system
+         users can browse and join groups -->
+    <section class="available-hero">
+        <div>
+            <p class="eyebrow">Group Directory</p>
+            <h1>Available Groups</h1>
+            <p class="muted">
+                Browse active savings circles and join the group that matches your contribution comfort.
+            </p>
         </div>
-    {% endfor %}
-{% else %}
-    <p>No groups available yet.</p>
-{% endif %}
+
+        <a href="{{ url_for('main.create_group') }}" class="btn btn-primary">
+            Create Group
+        </a>
+    </section>
+
+    <section class="available-stats" aria-label="Available group summary">
+        <div class="stat-tile compact">
+            <span>Total groups</span>
+            <strong>{{ groups|length }}</strong>
+        </div>
+
+        <div class="stat-tile compact">
+            <span>Total members</span>
+            <strong>
+                {% set total_members = namespace(count=0) %}
+                {% for group in groups %}
+                    {% set total_members.count = total_members.count + group.members|length %}
+                {% endfor %}
+                {{ total_members.count }}
+            </strong>
+        </div>
+
+        <div class="stat-tile compact">
+            <span>Ready to join</span>
+            <strong>{{ ready_count }}</strong>
+        </div>
+    </section>
+
+    <section class="available-section">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Open Circles</p>
+                <h2>Choose a savings group</h2>
+            </div>
+            <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+        </div>
+
+        {% if groups %}
+            <div class="available-grid">
+                <!-- Loop through all groups retrieved from database -->
+                {% for group in groups %}
+                    {% set already_joined = group.id in joined_group_ids %}
+                    {% set max_members = capacity_by_group.get(group.id, group.members|length) %}
+                    {% set current_members = group.members|length %}
+                    {% set is_full = is_full_by_group.get(group.id, false) %}
+                    {% set paid_count = paid_counts.get(group.id, 0) %}
+                    {% set payment_target = payment_targets.get(group.id, 0) %}
+
+                    <article class="available-card {% if already_joined %}is-joined{% endif %} {% if is_full %}is-full{% endif %}">
+                        <!-- Group identification -->
+                        <div class="available-card-header">
+                            <div>
+                                <h3>{{ group.name }}</h3>
+                                <p>Created {{ group.created_at.strftime('%Y-%m-%d') }}</p>
+                            </div>
+
+                            <div class="available-card-badges">
+                                <!-- Shows current group size against the planned max member count -->
+                                <span class="capacity-pill">&#128101; {{ current_members }}/{{ max_members }}</span>
+
+                                {% if already_joined %}
+                                    <span class="status-pill done">Joined</span>
+                                {% elif is_full %}
+                                    <span class="status-pill locked">Full</span>
+                                {% else %}
+                                    <span class="status-pill waiting">Open</span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="available-card-body">
+                            <div>
+                                <!-- Financial requirement per member -->
+                                <span>Contribution</span>
+                                <strong>${{ group.contribution_amount }}</strong>
+                            </div>
+
+                            <div>
+                                <!-- Tracks proof uploads for the current payout cycle -->
+                                <span>Proofs this cycle</span>
+                                <strong>{{ paid_count }}/{{ payment_target }}</strong>
+                            </div>
+                        </div>
+
+                        <!-- Sends POST request to backend to create membership
+                             This triggers GroupMember creation in database -->
+                        <form method="POST" action="{{ url_for('main.join_group', group_id=group.id) }}">
+                            <button class="btn {% if already_joined or is_full %}btn-secondary{% else %}btn-primary{% endif %} btn-full" {% if already_joined or is_full %}disabled{% endif %}>
+                                {% if already_joined %}
+                                    Already Joined
+                                {% elif is_full %}
+                                    Group Full
+                                {% else %}
+                                    Join Group
+                                {% endif %}
+                            </button>
+                        </form>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                No groups available yet.
+            </div>
+        {% endif %}
+    </section>
+</div>
 
 {% endblock %}

@@ -7,3 +7,6 @@ __pycache__/
 .DS_Store
 app.db
 .env
+app/uploads/
+*.log
+.codex-ui-backups/

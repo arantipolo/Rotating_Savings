@@ -1,37 +1,83 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="form-header">
-    <h1>Create Group</h1>
-</div>
-
-<div class="form-wrapper" style="max-width: 600px;">
-    <!--Sends data via POST to backend route -->
-    <form method="POST" class="form-card">
-
-        <!-- Group name input -->
-        <div class="field">
-            <label for="name">Group Name</label>
-            <!-- Identifies the group in the system -->
-            <input type="text" name="name" required>
+<div class="create-group-page">
+    <section class="create-hero">
+        <div>
+            <p class="eyebrow">New Savings Circle</p>
+            <h1>Create Group</h1>
+            <p class="muted">
+                Set the contribution amount, target group size, and create the circle where members can join before payout order is generated.
+            </p>
         </div>
 
-        <!-- Contribution amount input -->
-        <div class="field">
-            <label for="amount">Contribution Amount</label>
-            <!-- Defines how much each member contributes per cycle -->
-            <input type="number" name="amount" required>
-        </div>
+        <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">
+            Back to Dashboard
+        </a>
+    </section>
 
-        <div class="field">
-            <label for="members">Number of Members</label>
-             <!-- Used for planning group size (future expansion logic) -->
-            <input type="number" name="members" required>
-        </div>
+    <section class="create-layout">
+        <form method="POST" class="form-card form create-group-form">
+            <div>
+                <p class="eyebrow">Group Setup</p>
+                <h2>Circle details</h2>
+                <p class="muted">
+                    These values become the public group summary shown to users before they join.
+                </p>
+            </div>
 
-        <!-- Submit button triggers group creation process -->
-       <button type="submit" class="btn btn-primary">Create Group</button>
-    </form>
+            <!-- Group name input -->
+            <div class="field">
+                <label for="name">Group Name</label>
+                <!-- Identifies the group in the system -->
+                <input id="name" type="text" name="name" placeholder="Example: Friday Savings Circle" required>
+            </div>
+
+            <!-- Contribution amount input -->
+            <div class="field">
+                <label for="amount">Contribution Amount</label>
+                <!-- Defines how much each member contributes per cycle -->
+                <input id="amount" type="number" name="amount" min="1" step="0.01" placeholder="150.00" required>
+                <p class="field-help">
+                    This is the amount each member is expected to pay outside the app each cycle.
+                </p>
+            </div>
+
+            <div class="field">
+                <label for="members">Number of Members</label>
+                <!-- Used for planning group size (future expansion logic) -->
+                <input id="members" type="number" name="members" min="1" max="15" step="1" placeholder="15" required>
+                <p class="field-help">
+                    Groups can have up to 15 members.
+                </p>
+            </div>
+
+            <!-- Submit button triggers group creation process -->
+            <button type="submit" class="btn btn-primary btn-full">
+                Create Group
+            </button>
+        </form>
+
+        <aside class="create-guide">
+            <p class="eyebrow">How It Works</p>
+            <h2>After creation</h2>
+
+            <div class="guide-list">
+                <div>
+                    <span>1</span>
+                    <p>Members choose the group based on contribution amount and join.</p>
+                </div>
+                <div>
+                    <span>2</span>
+                    <p>The owner generates the payout order once the group is ready.</p>
+                </div>
+                <div>
+                    <span>3</span>
+                    <p>Members pay outside the app, then upload proof when payment is due.</p>
+                </div>
+            </div>
+        </aside>
+    </section>
 </div>
 
 {% endblock %}
