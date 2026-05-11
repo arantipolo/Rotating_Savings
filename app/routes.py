@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session, jsonify, abort, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session, jsonify, abort, current_app, send_from_directory
 from flask_login import login_user, logout_user, login_required, current_user
 from wtforms.validators import equal_to
 
@@ -659,6 +659,10 @@ def submit_payment(payout_id):
         "on_time": is_on_time
     })
 
+#this exposes the upload directory to the browser
+@main.route("/uploads/<filename>")
+def uploaded_file(filename):
+    return send_from_directory(current_app.config["UPLOAD_FOLDER"], filename)
 
 #user registration flow
 @main.route('/register', methods=['GET', 'POST'])

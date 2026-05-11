@@ -8,7 +8,7 @@
     {% endif %}
 
     {% if group.owner_id == current_user.id %}
-        <button class="btn btn-secondary" onclick="resetPayouts({{ group.id }})">
+        <button class="btn btn-secondary" alternate="Reset Group" onclick="resetPayouts({{ group.id }})">
             🔄
         </button>
     {% endif %}
@@ -59,21 +59,22 @@
         </td>
 
         <td>
-            {% set payout = group.payouts
-                | selectattr("recipient_id", "equalto", member.user_id)
-                | first %}
+            {#
+               search for the payment they made for the current active payout cycle.
+            #}
+
+            {% set payout = current_payout %}
 
             {% if payout %}
-                {% set payments = payment_map.values()
-                    | selectattr("payout_id", "equalto", payout.id)
-                    | list %}
+                {% set payment = payment_map.get((payout.id, member.user_id)) %}
 
-                {% set any_proof = payments
-                    | selectattr("proof_image")
-                    | first %}
+                {#
+                    payment_map key = (payout_id, payer_id)
+                   match if this member pay this payout
+                #}
 
-                {% if any_proof %}
-                    <button onclick="viewProof('{{ any_proof.proof_image }}')">
+                {% if payment and payment.proof_image %}
+                    <button onclick="viewProof('{{ payment.proof_image }}')">
                         View Proof
                     </button>
                 {% else %}
@@ -83,6 +84,7 @@
                 -
             {% endif %}
         </td>
+
 
     </tr>
     {% endfor %}

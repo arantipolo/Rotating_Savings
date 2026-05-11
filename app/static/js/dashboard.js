@@ -187,6 +187,7 @@ window.submitProofUpload = function () {
             console.log(data);
             alert("Uploaded!");
             closeUploadModal();
+            window.openModal(currentGroupId);
         })
     .catch(err => console.error(err));
 };
@@ -196,7 +197,9 @@ window.submitProofUpload = function () {
 window.viewProof = function(filename){
     const imgWindow = window.open("");
 
-    imgWindow.document.write(`<img src="/app/uploads/${filename}" style="width:100%" alt="Receipt">`);
+    imgWindow.document.write(`
+    <img src="/uploads/${filename}" style="width:100%" alt="Receipt">
+`);
 }
 
 
