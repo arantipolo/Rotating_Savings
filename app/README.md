@@ -182,3 +182,10 @@ erDiagram
 
     PAYOUT_SCHEDULE ||--o{ PAYMENT : includes
 ```
+
+### Screenshots
+- Login page
+![img_1.png](img_1.png)
+
+- Dashboard
+![img.png](img.png)
